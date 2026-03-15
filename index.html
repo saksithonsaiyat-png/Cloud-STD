@@ -1,1060 +1,504 @@
-<!DOCTYPE html>
-<html lang="th" class="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StudentCloud - ระบบจัดเก็บข้อมูล</title>
-    
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Kanit', 'sans-serif'] },
-                    colors: {
-                        primary: '#4F46E5', secondary: '#10B981',
-                        darkbg: '#111827', darkcard: '#1F2937',
-                    }
-                }
-            }
+import React, { useState, useEffect, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc, updateDoc, deleteDoc, query, getDoc } from 'firebase/firestore';
+import { 
+  Cloud, FolderPlus, Upload, File, Image as ImageIcon, FileCode, FileText, 
+  Trash2, Pencil, Copy, Move, MoreVertical, LayoutGrid, List, Sun, Moon,
+  LogOut, Settings, ChevronRight, Home, Info, X, CheckCircle2, AlertCircle
+} from 'lucide-react';
+
+// Firebase Configuration from environment
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'student-cloud-v4';
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState('light');
+  const [currentView, setCurrentView] = useState('home');
+  const [currentFolderId, setCurrentFolderId] = useState(null);
+  const [folders, setFolders] = useState([]);
+  const [files, setFiles] = useState([]);
+  const [activeModal, setActiveModal] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [inputValue, setInputValue] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // 1. Authentication
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
         }
-    </script>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+      } catch (error) {
+        showToast("ไม่สามารถเข้าสู่ระบบฐานข้อมูลได้", "error");
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-    <style>
-        body { font-family: 'Kanit', sans-serif; -webkit-tap-highlight-color: transparent; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .dark ::-webkit-scrollbar-thumb { background: #4b5563; }
-        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-        .dark .glass { background: rgba(31, 41, 55, 0.85); }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4F46E5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        #preview-content img { max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        #preview-content iframe { width: 100%; height: 75vh; border-radius: 0.5rem; background: white; }
-        #preview-content pre { width: 100%; max-height: 75vh; overflow: auto; text-align: left; background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 0.5rem; font-family: monospace; }
-        
-        /* Disable text selection on UI elements for better touch experience */
-        .no-select { user-select: none; -webkit-user-select: none; }
-    </style>
-</head>
-<body class="bg-gray-50 text-gray-800 dark:bg-darkbg dark:text-gray-200 overflow-hidden no-select">
+  // 2. Data Sync with Firestore (Rules compliant)
+  useEffect(() => {
+    if (!user) return;
 
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white dark:bg-darkbg transition-opacity duration-300">
-        <div class="loader mb-4"></div>
-        <h2 class="text-xl font-bold text-primary">StudentCloud</h2>
-        <p class="text-gray-500 dark:text-gray-400 mt-2">กำลังเตรียมระบบฐานข้อมูล...</p>
-    </div>
+    // Sync Folders
+    const folderCol = collection(db, 'artifacts', appId, 'users', user.uid, 'folders');
+    const unsubFolders = onSnapshot(folderCol, (snapshot) => {
+      const folderList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFolders(folderList);
+    }, (err) => console.error("Folder Sync Error:", err));
 
-    <!-- Login System -->
-    <div id="login-view" class="hidden fixed inset-0 z-40 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-darkcard rounded-3xl shadow-xl w-full max-w-md p-8 fade-in relative overflow-hidden">
-            <div class="text-center mb-8">
-                <i class="ph-fill ph-cloud-check text-5xl text-primary mb-2"></i>
-                <h1 class="text-3xl font-bold">StudentCloud</h1>
-                <p class="text-gray-500 dark:text-gray-400 mt-2">พื้นที่เก็บงานส่วนตัวไว้ใน Browser</p>
-            </div>
-            <form id="login-form" class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium mb-1">ชื่อโปรไฟล์ของคุณ</label>
-                    <input type="text" id="username" required placeholder="ป้อนชื่อผู้ใช้" 
-                        class="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary text-gray-800 dark:text-gray-200">
-                </div>
-                <button type="submit" class="w-full py-3 rounded-xl font-medium bg-primary text-white hover:bg-indigo-700 active:scale-[0.98] transition-all">
-                    เข้าใช้งาน
-                </button>
-            </form>
+    // Sync Files
+    const fileCol = collection(db, 'artifacts', appId, 'users', user.uid, 'files');
+    const unsubFiles = onSnapshot(fileCol, (snapshot) => {
+      const fileList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFiles(fileList);
+    }, (err) => console.error("File Sync Error:", err));
+
+    return () => {
+      unsubFolders();
+      unsubFiles();
+    };
+  }, [user]);
+
+  // Utility: Toast
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Actions: Upload
+  const handleUpload = async (e) => {
+    const selectedFiles = Array.from(e.target.files);
+    if (!selectedFiles.length || !user) return;
+
+    showToast(`กำลังอัปโหลด ${selectedFiles.length} ไฟล์...`, 'info');
+
+    for (const file of selectedFiles) {
+      try {
+        // Convert file to Base64 (Using Firestore as storage for simplicity/demo)
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+          const base64Data = reader.result;
+          
+          const fileData = {
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            data: base64Data, // เก็บข้อมูลไฟล์จริง
+            folderId: currentFolderId,
+            createdAt: Date.now(),
+            category: getCategory(file.name)
+          };
+
+          await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'files'), fileData);
+          showToast(`อัปโหลด ${file.name} สำเร็จ`);
+        };
+      } catch (err) {
+        showToast(`เกิดข้อผิดพลาดกับไฟล์ ${file.name}`, 'error');
+      }
+    }
+    e.target.value = null;
+  };
+
+  const getCategory = (name) => {
+    const ext = name.split('.').pop().toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'รูปภาพ';
+    if (['html', 'css', 'js', 'py', 'json'].includes(ext)) return 'โค้ด';
+    if (['pdf', 'doc', 'docx', 'txt'].includes(ext)) return 'เอกสาร';
+    return 'ทั่วไป';
+  };
+
+  const createFolder = async () => {
+    if (!inputValue.trim() || !user) return;
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'folders'), {
+        name: inputValue.trim(),
+        createdAt: Date.now()
+      });
+      setInputValue('');
+      setActiveModal(null);
+      showToast('สร้างโฟลเดอร์สำเร็จ');
+    } catch (err) {
+      showToast('สร้างโฟลเดอร์ไม่สำเร็จ', 'error');
+    }
+  };
+
+  const deleteItem = async (id, type) => {
+    if (!user) return;
+    try {
+      const collectionName = type === 'folder' ? 'folders' : 'files';
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, collectionName, id));
+      setActiveModal(null);
+      showToast('ลบรายการสำเร็จ');
+    } catch (err) {
+      showToast('ลบไม่สำเร็จ', 'error');
+    }
+  };
+
+  const renameFile = async () => {
+    if (!inputValue.trim() || !user || !selectedItem) return;
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'files', selectedItem.id), {
+        name: inputValue.trim()
+      });
+      setInputValue('');
+      setActiveModal(null);
+      showToast('เปลี่ยนชื่อสำเร็จ');
+    } catch (err) {
+      showToast('เปลี่ยนชื่อไม่สำเร็จ', 'error');
+    }
+  };
+
+  const copyFile = async () => {
+    if (!user || !selectedItem) return;
+    try {
+      const { id, ...rest } = selectedItem;
+      const copyData = { 
+        ...rest, 
+        name: rest.name + " (สำเนา)", 
+        createdAt: Date.now() 
+      };
+      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'files'), copyData);
+      setActiveModal(null);
+      showToast('คัดลอกไฟล์สำเร็จ');
+    } catch (err) {
+      showToast('คัดลอกไม่สำเร็จ', 'error');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-500 font-medium">กำลังเตรียมคลาวด์ส่วนตัว...</p>
+      </div>
+    );
+  }
+
+  const currentFolder = folders.find(f => f.id === currentFolderId);
+  const displayFiles = currentView === 'home' 
+    ? files.filter(f => !f.folderId)
+    : currentView === 'folder' 
+      ? files.filter(f => f.folderId === currentFolderId)
+      : files.filter(f => f.category === currentView);
+
+  return (
+    <div className={`h-screen flex flex-col ${theme === 'dark' ? 'dark bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all animate-bounce ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-gray-900 text-white'}`}>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} className="text-green-400" />}
+          <span className="text-sm font-medium">{toast.message}</span>
         </div>
-    </div>
+      )}
 
-    <!-- Main Dashboard -->
-    <div id="main-view" class="hidden h-[100dvh] w-full flex bg-gray-50 dark:bg-darkbg">
+      {/* Main Layout */}
+      <div className="flex flex-1 overflow-hidden">
         
-        <!-- Sidebar -->
-        <div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-20 hidden lg:hidden transition-opacity"></div>
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-darkcard border-r border-gray-200 dark:border-gray-700 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col">
-            <div class="h-16 flex items-center px-6 border-b border-gray-100 dark:border-gray-800">
-                <i class="ph-fill ph-cloud-check text-2xl text-primary mr-2"></i>
-                <span class="text-xl font-bold">StudentCloud</span>
-                <button id="close-sidebar" class="ml-auto lg:hidden p-2 text-gray-500 active:bg-gray-100 rounded-lg">
-                    <i class="ph-bold ph-x text-xl"></i>
-                </button>
-            </div>
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        )}
 
-            <!-- Profile Area -->
-            <div class="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors active:bg-gray-100" id="btn-open-settings">
-                <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 flex items-center justify-center text-white font-bold text-lg" id="user-avatar">U</div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold truncate" id="display-username">Username</p>
-                    <p class="text-xs text-primary flex items-center gap-1"><i class="ph-fill ph-gear"></i> ตั้งค่าโปรไฟล์</p>
-                </div>
+        {/* Sidebar */}
+        <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="h-20 flex items-center px-6 gap-3">
+            <div className="p-2 bg-indigo-600 rounded-xl text-white">
+              <Cloud size={24} />
             </div>
+            <span className="text-xl font-bold tracking-tight">StudentCloud</span>
+          </div>
 
-            <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1" id="main-menu"></nav>
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            <NavItem active={currentView === 'home'} icon={<Home size={20}/>} label="หน้าแรก" onClick={() => { setCurrentView('home'); setCurrentFolderId(null); setSidebarOpen(false); }} />
+            <div className="py-2 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">หมวดหมู่</div>
+            <NavItem active={currentView === 'รูปภาพ'} icon={<ImageIcon size={20}/>} label="รูปภาพ" onClick={() => { setCurrentView('รูปภาพ'); setSidebarOpen(false); }} />
+            <NavItem active={currentView === 'โค้ด'} icon={<FileCode size={20}/>} label="โปรเจกต์โค้ด" onClick={() => { setCurrentView('โค้ด'); setSidebarOpen(false); }} />
+            <NavItem active={currentView === 'เอกสาร'} icon={<FileText size={20}/>} label="เอกสาร" onClick={() => { setCurrentView('เอกสาร'); setSidebarOpen(false); }} />
+            
+            <div className="py-2 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">โฟลเดอร์</div>
+            {folders.map(f => (
+              <NavItem 
+                key={f.id} 
+                active={currentView === 'folder' && currentFolderId === f.id} 
+                icon={<FolderPlus size={20}/>} 
+                label={f.name} 
+                onClick={() => { setCurrentView('folder'); setCurrentFolderId(f.id); setSidebarOpen(false); }} 
+              />
+            ))}
+          </nav>
 
-            <div class="p-4 border-t border-gray-100 dark:border-gray-800">
-                <button id="btn-logout" class="w-full py-2.5 flex items-center justify-center gap-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors font-medium active:scale-[0.98]">
-                    <i class="ph-bold ph-sign-out"></i> ออกจากระบบ
-                </button>
+          <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+            <button 
+              onClick={() => { setTheme(theme === 'light' ? 'dark' : 'light'); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              {theme === 'light' ? <Moon size={20}/> : <Sun size={20}/>}
+              <span className="text-sm font-medium">โหมด{theme === 'light' ? 'มืด' : 'สว่าง'}</span>
+            </button>
+            <div className="mt-4 flex items-center gap-3 px-4 py-3">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold">
+                {user?.uid.substring(0, 1).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold truncate">UID: {user?.uid.substring(0, 8)}...</p>
+                <p className="text-[10px] text-green-500 font-bold uppercase">Online</p>
+              </div>
             </div>
+          </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden">
-            <header class="h-16 glass z-10 flex items-center justify-between px-4 lg:px-8 border-b border-gray-200 dark:border-gray-700">
-                <div class="flex items-center gap-4 flex-1">
-                    <button id="open-sidebar" class="lg:hidden p-2 -ml-2 text-gray-500 active:bg-gray-100 dark:active:bg-gray-800 rounded-lg">
-                        <i class="ph-bold ph-list text-2xl"></i>
-                    </button>
-                </div>
-                <div class="flex items-center gap-2 sm:gap-4">
-                    <button id="theme-toggle" class="p-2 text-gray-500 rounded-full bg-gray-100 dark:bg-gray-800 active:scale-95 transition-transform">
-                        <i class="ph-fill ph-moon text-xl dark:hidden"></i>
-                        <i class="ph-fill ph-sun text-xl hidden dark:block text-yellow-400"></i>
-                    </button>
-                    <button id="btn-upload-nav" class="bg-primary text-white px-5 py-2.5 rounded-full text-sm font-medium flex items-center gap-2 active:scale-95 transition-transform shadow-lg shadow-indigo-200 dark:shadow-none">
-                        <i class="ph-bold ph-upload-simple"></i> <span class="hidden sm:inline">อัปโหลดไฟล์</span>
-                    </button>
-                    <input type="file" id="file-input" multiple class="hidden">
-                </div>
-            </header>
-
-            <div id="content-area" class="flex-1 overflow-y-auto p-4 lg:p-8 relative pb-24">
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end mb-6 gap-4">
-                    <div>
-                        <h2 id="view-title" class="text-2xl sm:text-3xl font-bold">หน้าแรก</h2>
-                        <p id="view-subtitle" class="text-sm text-gray-500 mt-1">ภาพรวมไฟล์และโฟลเดอร์</p>
-                    </div>
-                    <div id="folder-actions">
-                        <button id="btn-create-folder" class="w-full sm:w-auto flex items-center justify-center gap-2 text-sm bg-white dark:bg-darkcard border border-gray-200 dark:border-gray-700 px-4 py-2.5 rounded-xl active:bg-gray-50 dark:active:bg-gray-700 font-medium transition-colors shadow-sm">
-                            <i class="ph-bold ph-folder-plus text-lg text-primary"></i> สร้างโฟลเดอร์
-                        </button>
-                    </div>
-                </div>
-
-                <div id="breadcrumb" class="hidden flex flex-wrap items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-darkcard w-fit px-4 py-2 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
-                    <button class="hover:text-primary active:text-primary flex items-center gap-1 btn-nav-home font-medium transition-colors"><i class="ph-fill ph-house"></i> หน้าแรก</button>
-                    <i class="ph-bold ph-caret-right text-xs"></i>
-                    <span id="breadcrumb-current" class="font-medium text-gray-800 dark:text-gray-200">โฟลเดอร์</span>
-                </div>
-
-                <!-- Folders -->
-                <section id="section-folders" class="mb-8">
-                    <h3 class="text-sm font-semibold text-gray-500 uppercase mb-4 flex items-center gap-2 tracking-wide"><i class="ph-fill ph-folder"></i> โฟลเดอร์</h3>
-                    <div id="folders-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
-                </section>
-
-                <!-- Files -->
-                <section id="section-files">
-                    <h3 class="text-sm font-semibold text-gray-500 uppercase mb-4 flex items-center gap-2 tracking-wide"><i class="ph-fill ph-file"></i> ไฟล์</h3>
-                    <div id="files-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
-                    
-                    <div id="no-files-msg" class="hidden text-center py-16 px-4 bg-white dark:bg-darkcard rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                        <i class="ph-duotone ph-upload-simple text-5xl text-gray-300 dark:text-gray-600 mb-3 block"></i>
-                        <p class="text-gray-500 mb-4">ยังไม่มีไฟล์ในหน้านี้</p>
-                        <button class="bg-indigo-50 dark:bg-indigo-900/30 text-primary px-5 py-2.5 rounded-xl font-medium btn-trigger-upload active:scale-95 transition-transform">แตะเพื่ออัปโหลดไฟล์</button>
-                    </div>
-                </section>
+        {/* Content Area */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          
+          {/* Header */}
+          <header className="h-20 border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md flex items-center justify-between px-6 lg:px-10">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                <List size={24} />
+              </button>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {currentView === 'home' ? 'หน้าแรก' : currentView === 'folder' ? currentFolder?.name : currentView}
+              </h1>
             </div>
+
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setActiveModal('createFolder')}
+                className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-all"
+              >
+                <FolderPlus size={18} /> สร้างโฟลเดอร์
+              </button>
+              <button 
+                onClick={() => fileInputRef.current.click()}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all"
+              >
+                <Upload size={18} /> อัปโหลด
+              </button>
+              <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleUpload} />
+            </div>
+          </header>
+
+          {/* Grid Content */}
+          <div className="flex-1 overflow-y-auto p-6 lg:p-10 pb-20">
+            
+            {/* Breadcrumb for folders */}
+            {currentFolder && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-gray-900 w-fit px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-800">
+                <span className="hover:text-indigo-600 cursor-pointer" onClick={() => { setCurrentView('home'); setCurrentFolderId(null); }}>หน้าแรก</span>
+                <ChevronRight size={14} />
+                <span className="font-bold text-gray-900 dark:text-white">{currentFolder.name}</span>
+              </div>
+            )}
+
+            {displayFiles.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                <div className="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
+                  <Cloud size={40} />
+                </div>
+                <h3 className="text-xl font-bold">ว่างเปล่า</h3>
+                <p className="text-sm mt-2">ยังไม่มีไฟล์ในหมวดหมู่นี้ อัปโหลดไฟล์แรกของคุณเลย!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {displayFiles.map(file => (
+                  <FileCard 
+                    key={file.id} 
+                    file={file} 
+                    onAction={(action) => {
+                      setSelectedItem(file);
+                      if (action === 'preview') setActiveModal('preview');
+                      else if (action === 'rename') { setInputValue(file.name); setActiveModal('rename'); }
+                      else if (action === 'delete') setActiveModal('delete');
+                      else if (action === 'copy') copyFile();
+                    }} 
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </main>
-    </div>
+      </div>
 
-    <!-- ================= MODALS ================= -->
+      {/* MODALS */}
+      {activeModal === 'createFolder' && (
+        <Modal title="สร้างโฟลเดอร์ใหม่" onClose={() => setActiveModal(null)} onConfirm={createFolder}>
+          <input 
+            autoFocus
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+            placeholder="ชื่อโฟลเดอร์..."
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+          />
+        </Modal>
+      )}
 
-    <!-- Custom Alert Modal -->
-    <div id="modal-alert" class="hidden fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-darkcard w-full max-w-sm rounded-2xl p-6 fade-in shadow-2xl text-center">
-            <div id="alert-icon-container" class="mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
-                <i id="alert-icon" class="ph-fill ph-info text-3xl text-blue-500"></i>
-            </div>
-            <h3 id="alert-title" class="text-lg font-bold mb-2">แจ้งเตือน</h3>
-            <p id="alert-message" class="text-gray-600 dark:text-gray-400 mb-6 text-sm">ข้อความแจ้งเตือน</p>
-            <button class="close-alert w-full py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-xl font-medium active:scale-95 transition-all text-gray-800 dark:text-white">ตกลง</button>
-        </div>
-    </div>
+      {activeModal === 'rename' && (
+        <Modal title="เปลี่ยนชื่อไฟล์" onClose={() => setActiveModal(null)} onConfirm={renameFile}>
+          <input 
+            autoFocus
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+            placeholder="ชื่อใหม่..."
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+          />
+        </Modal>
+      )}
 
-    <!-- Custom Confirm Modal -->
-    <div id="modal-confirm" class="hidden fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-darkcard w-full max-w-sm rounded-2xl p-6 fade-in shadow-2xl text-center">
-            <div class="mx-auto w-16 h-16 bg-red-50 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
-                <i class="ph-fill ph-warning-circle text-3xl text-red-500"></i>
-            </div>
-            <h3 id="confirm-title" class="text-lg font-bold mb-2">ยืนยันการดำเนินการ</h3>
-            <p id="confirm-message" class="text-gray-600 dark:text-gray-400 mb-6 text-sm">คุณแน่ใจหรือไม่?</p>
-            <div class="flex gap-3">
-                <button class="close-confirm flex-1 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl font-medium active:scale-95 transition-all">ยกเลิก</button>
-                <button id="btn-confirm-action" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium active:scale-95 transition-all shadow-lg shadow-red-500/30">ยืนยัน</button>
-            </div>
-        </div>
-    </div>
+      {activeModal === 'delete' && (
+        <Modal title="ยืนยันการลบ" onClose={() => setActiveModal(null)} onConfirm={() => deleteItem(selectedItem.id, 'file')} danger>
+          <p className="text-gray-500 dark:text-gray-400">คุณแน่ใจหรือไม่ว่าต้องการลบไฟล์ <span className="font-bold text-gray-900 dark:text-white">"{selectedItem?.name}"</span>? การดำเนินการนี้ไม่สามารถกู้คืนได้</p>
+        </Modal>
+      )}
 
-    <!-- Modal File Actions (Context Menu) -->
-    <div id="modal-file-actions" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
-        <div class="bg-white dark:bg-darkcard w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl p-6 fade-in shadow-2xl">
-            <div class="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-gray-800 pb-4">
-                <div class="flex-1 min-w-0 pr-4 flex items-center gap-3">
-                    <div id="action-icon-box" class="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-gray-800"></div>
-                    <div class="flex-1 min-w-0">
-                        <h3 id="action-filename" class="font-bold text-base truncate text-gray-800 dark:text-gray-200">filename.jpg</h3>
-                        <p class="text-xs text-gray-500">จัดการไฟล์</p>
-                    </div>
-                </div>
-                <button class="close-modal bg-gray-100 dark:bg-gray-800 p-2 rounded-full text-gray-500 active:scale-95 transition-transform"><i class="ph-bold ph-x"></i></button>
+      {activeModal === 'preview' && selectedItem && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-300">
+          <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-md text-white border-b border-white/10">
+            <div className="flex-1 min-w-0 pr-4">
+              <h2 className="font-bold truncate">{selectedItem.name}</h2>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest">{selectedItem.category}</p>
             </div>
-            
-            <div class="space-y-1.5">
-                <button id="btn-action-view" class="w-full flex items-center gap-3 p-3 rounded-xl active:bg-blue-50 dark:active:bg-blue-900/20 transition-colors text-left font-medium text-gray-700 dark:text-gray-200">
-                    <div class="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-500"><i class="ph-bold ph-eye text-lg"></i></div>
-                    เปิดดูไฟล์
-                </button>
-                <button id="btn-action-rename" class="w-full flex items-center gap-3 p-3 rounded-xl active:bg-green-50 dark:active:bg-green-900/20 transition-colors text-left font-medium text-gray-700 dark:text-gray-200">
-                    <div class="w-9 h-9 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-500"><i class="ph-bold ph-pencil-simple text-lg"></i></div>
-                    เปลี่ยนชื่อ
-                </button>
-                <button id="btn-action-move" class="w-full flex items-center gap-3 p-3 rounded-xl active:bg-orange-50 dark:active:bg-orange-900/20 transition-colors text-left font-medium text-gray-700 dark:text-gray-200">
-                    <div class="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center text-orange-500"><i class="ph-bold ph-folder-notch-open text-lg"></i></div>
-                    ย้ายโฟลเดอร์
-                </button>
-                <button id="btn-action-copy" class="w-full flex items-center gap-3 p-3 rounded-xl active:bg-purple-50 dark:active:bg-purple-900/20 transition-colors text-left font-medium text-gray-700 dark:text-gray-200">
-                    <div class="w-9 h-9 rounded-full bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center text-purple-500"><i class="ph-bold ph-copy text-lg"></i></div>
-                    คัดลอกไฟล์
-                </button>
-                <div class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
-                <button id="btn-action-delete" class="w-full flex items-center gap-3 p-3 rounded-xl active:bg-red-50 dark:active:bg-red-900/20 transition-colors text-left font-medium text-red-500">
-                    <div class="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center"><i class="ph-bold ph-trash text-lg"></i></div>
-                    ลบไฟล์นี้
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Input (Reusable for Rename/Create Folder) -->
-    <div id="modal-input" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-darkcard w-full max-w-sm rounded-2xl p-6 fade-in shadow-2xl">
-            <h3 id="modal-input-title" class="text-lg font-bold mb-4">หัวข้อ</h3>
-            <input type="text" id="modal-input-field" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary mb-5 text-gray-800 dark:text-gray-200">
-            <div class="flex gap-3">
-                <button class="close-modal flex-1 py-3 rounded-xl font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 active:scale-95 transition-transform">ยกเลิก</button>
-                <button id="modal-input-confirm" class="flex-1 py-3 rounded-xl font-medium bg-primary text-white active:scale-95 transition-transform shadow-lg shadow-indigo-500/30">บันทึก</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Select Folder (For Move/Copy) -->
-    <div id="modal-select-folder" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-darkcard w-full max-w-sm rounded-2xl p-6 fade-in flex flex-col max-h-[80vh] shadow-2xl">
-            <h3 id="select-folder-title" class="text-lg font-bold mb-4">เลือกปลายทาง</h3>
-            <div id="select-folder-list" class="flex-1 overflow-y-auto space-y-2 mb-5 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-xl border border-gray-100 dark:border-gray-700">
-                <!-- List generated by JS -->
-            </div>
-            <button class="close-modal w-full py-3 rounded-xl font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 active:scale-95 transition-transform">ยกเลิก</button>
-        </div>
-    </div>
-
-    <!-- Modal Profile Settings -->
-    <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-darkcard rounded-2xl w-full max-w-sm p-6 fade-in shadow-2xl">
-            <h3 class="text-lg font-bold mb-5 flex items-center gap-2"><i class="ph-fill ph-gear text-primary"></i> ตั้งค่าโปรไฟล์</h3>
-            
-            <div class="mb-5">
-                <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">ชื่อที่แสดงผล</label>
-                <input type="text" id="settings-username" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary text-gray-800 dark:text-gray-200">
-            </div>
-            
-            <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/50 mb-6">
-                <h4 class="text-sm font-bold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1"><i class="ph-fill ph-warning-circle"></i> ล้างข้อมูลแอป</h4>
-                <p class="text-xs text-red-500/80 mb-3">ลบไฟล์ทั้งหมดและบัญชีออกจาก iPad เครื่องนี้</p>
-                <button id="btn-clear-alldata" class="w-full py-2 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium active:scale-95 transition-transform">
-                    ลบข้อมูลทั้งหมด
-                </button>
-            </div>
-
-            <div class="flex gap-3">
-                <button class="close-modal flex-1 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl font-medium active:scale-95 transition-transform">ปิด</button>
-                <button id="btn-save-settings" class="flex-1 py-3 bg-primary text-white rounded-xl font-medium active:scale-95 transition-transform shadow-lg shadow-indigo-500/30">บันทึกข้อมูล</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Preview Real File -->
-    <div id="modal-preview-file" class="hidden fixed inset-0 z-[70] bg-black/95 backdrop-blur-md flex flex-col transition-opacity">
-        <div class="flex justify-between items-center p-4 text-white bg-gradient-to-b from-black/80 to-transparent">
-            <div class="flex-1 truncate pr-4">
-                <h3 id="preview-filename" class="font-bold text-lg truncate">filename.jpg</h3>
-                <p id="preview-meta" class="text-xs text-gray-400">ขนาดไฟล์</p>
-            </div>
-            <button class="close-preview text-white bg-white/10 p-3 rounded-full active:bg-white/20 transition-colors">
-                <i class="ph-bold ph-x text-xl"></i>
+            <button onClick={() => setActiveModal(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+              <X size={20} />
             </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+            {selectedItem.type.startsWith('image/') ? (
+              <img src={selectedItem.data} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt={selectedItem.name} />
+            ) : selectedItem.type.includes('text') || selectedItem.type.includes('javascript') ? (
+              <div className="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-indigo-300 border border-white/10">
+                <pre>{atob(selectedItem.data.split(',')[1])}</pre>
+              </div>
+            ) : (
+              <div className="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10 max-w-sm">
+                <File size={60} className="mx-auto mb-4 opacity-50" />
+                <h3 className="text-xl font-bold">ไม่สามารถดูตัวอย่างได้</h3>
+                <p className="text-sm text-gray-400 mt-2">ไฟล์ประเภทนี้ไม่รองรับการแสดงผลโดยตรง คุณสามารถดาวน์โหลดไปเปิดในแอปอื่นได้</p>
+              </div>
+            )}
+          </div>
         </div>
-        <div class="flex-1 overflow-auto flex items-center justify-center p-4 relative" id="preview-content">
-            <!-- เนื้อหาไฟล์จะถูกใส่ที่นี่ด้วย JS -->
+      )}
+
+    </div>
+  );
+}
+
+// Reusable Components
+function NavItem({ active, icon, label, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+        active 
+          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' 
+          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function FileCard({ file, onAction }) {
+  const [showMenu, setShowMenu] = useState(false);
+  
+  const getIcon = () => {
+    switch(file.category) {
+      case 'รูปภาพ': return <ImageIcon className="text-purple-500" />;
+      case 'โค้ด': return <FileCode className="text-blue-500" />;
+      case 'เอกสาร': return <FileText className="text-emerald-500" />;
+      default: return <File className="text-gray-500" />;
+    }
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex items-center gap-4 hover:shadow-xl hover:shadow-gray-200 dark:hover:shadow-none transition-all group relative">
+      <div 
+        onClick={() => onAction('preview')}
+        className="w-14 h-14 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 cursor-pointer group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/20 transition-colors"
+      >
+        {getIcon()}
+      </div>
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onAction('preview')}>
+        <h3 className="font-bold text-sm truncate pr-6">{file.name}</h3>
+        <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">
+          {(file.size / 1024).toFixed(1)} KB • {new Date(file.createdAt).toLocaleDateString('th-TH')}
+        </p>
+      </div>
+      
+      <div className="absolute top-4 right-4">
+        <button onClick={() => setShowMenu(!showMenu)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 transition-colors">
+          <MoreVertical size={18} />
+        </button>
+        {showMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl z-20 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+              <MenuBtn icon={<ImageIcon size={16}/>} label="เปิดดู" onClick={() => { onAction('preview'); setShowMenu(false); }} />
+              <MenuBtn icon={<Pencil size={16}/>} label="เปลี่ยนชื่อ" onClick={() => { onAction('rename'); setShowMenu(false); }} />
+              <MenuBtn icon={<Copy size={16}/>} label="คัดลอก" onClick={() => { onAction('copy'); setShowMenu(false); }} />
+              <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+              <MenuBtn icon={<Trash2 size={16}/>} label="ลบทิ้ง" danger onClick={() => { onAction('delete'); setShowMenu(false); }} />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuBtn({ icon, label, onClick, danger }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
+        danger ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function Modal({ title, children, onClose, onConfirm, danger }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-200">
+        <h2 className="text-xl font-bold mb-6">{title}</h2>
+        <div className="mb-8">{children}</div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-3.5 rounded-2xl bg-gray-100 dark:bg-gray-800 font-bold text-sm hover:bg-gray-200 transition-colors">ยกเลิก</button>
+          <button 
+            onClick={onConfirm} 
+            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg transition-all active:scale-95 ${
+              danger ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
+            }`}
+          >
+            ยืนยัน
+          </button>
         </div>
+      </div>
     </div>
-
-    <!-- Notification Toast -->
-    <div id="notification" class="fixed top-4 left-1/2 transform -translate-x-1/2 -translate-y-24 opacity-0 z-[120] transition-all duration-300 bg-gray-800 text-white px-5 py-3.5 rounded-full shadow-2xl flex items-center gap-3 w-max max-w-[90vw] pointer-events-none border border-gray-700">
-        <i id="notif-icon" class="ph-fill ph-check-circle text-green-400 text-xl"></i>
-        <span id="notif-text" class="text-sm font-medium">แจ้งเตือน</span>
-    </div>
-
-    <!-- ================= JAVASCRIPT ================= -->
-    <script>
-        // ---------------------------------------------------------
-        // 1. ระบบฐานข้อมูล (IndexedDB) แบบรัดกุมสำหรับ iPad
-        // ---------------------------------------------------------
-        const DB_NAME = 'StudentCloudDB_V3';
-        const DB_VERSION = 1;
-        const STORE_FILES = 'files_blob_store';
-        let db;
-
-        const initDB = () => {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onerror = (e) => reject("DB_ERROR");
-                request.onupgradeneeded = (e) => {
-                    const database = e.target.result;
-                    if (!database.objectStoreNames.contains(STORE_FILES)) {
-                        database.createObjectStore(STORE_FILES, { keyPath: 'id' });
-                    }
-                };
-                request.onsuccess = (e) => {
-                    db = e.target.result;
-                    resolve(db);
-                };
-            });
-        };
-
-        const saveFileBlob = (id, blob) => {
-            return new Promise((resolve, reject) => {
-                if(!db) return reject("DB_NOT_READY");
-                try {
-                    const tx = db.transaction([STORE_FILES], 'readwrite');
-                    const store = tx.objectStore(STORE_FILES);
-                    store.put({ id: id, blob: blob });
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => reject(tx.error);
-                } catch(e) {
-                    reject(e);
-                }
-            });
-        };
-
-        const getFileBlob = (id) => {
-            return new Promise((resolve, reject) => {
-                if(!db) return resolve(null);
-                try {
-                    const tx = db.transaction([STORE_FILES], 'readonly');
-                    const store = tx.objectStore(STORE_FILES);
-                    const req = store.get(id);
-                    req.onsuccess = () => resolve(req.result ? req.result.blob : null);
-                    req.onerror = () => reject(req.error);
-                } catch(e) {
-                    reject(e);
-                }
-            });
-        };
-
-        const deleteFileBlob = (id) => {
-            return new Promise((resolve) => {
-                if(!db) return resolve();
-                try {
-                    const tx = db.transaction([STORE_FILES], 'readwrite');
-                    tx.objectStore(STORE_FILES).delete(id);
-                    tx.oncomplete = () => resolve();
-                    tx.onerror = () => resolve(); // Ignore delete errors
-                } catch(e) {
-                    resolve();
-                }
-            });
-        };
-
-        const clearAllDB = () => {
-            return new Promise((resolve) => {
-                if(db) db.close();
-                const req = indexedDB.deleteDatabase(DB_NAME);
-                req.onsuccess = () => resolve();
-                req.onerror = () => resolve();
-            });
-        };
-
-        // ---------------------------------------------------------
-        // 2. Custom UI Components (แทน Alert / Confirm)
-        // ---------------------------------------------------------
-        const UI = {
-            toast: (msg, type = 'success') => {
-                const notif = document.getElementById('notification');
-                document.getElementById('notif-text').textContent = msg;
-                const icon = document.getElementById('notif-icon');
-                if (type === 'success') {
-                    icon.className = 'ph-fill ph-check-circle text-green-400 text-xl';
-                } else if (type === 'error') {
-                    icon.className = 'ph-fill ph-x-circle text-red-400 text-xl';
-                } else {
-                    icon.className = 'ph-fill ph-info text-blue-400 text-xl';
-                }
-                
-                notif.classList.remove('-translate-y-24', 'opacity-0');
-                notif.classList.add('translate-y-4', 'opacity-100');
-                setTimeout(() => {
-                    notif.classList.remove('translate-y-4', 'opacity-100');
-                    notif.classList.add('-translate-y-24', 'opacity-0');
-                }, 3000);
-            },
-            
-            alert: (msg, title = 'แจ้งเตือน', type = 'info') => {
-                document.getElementById('alert-title').textContent = title;
-                document.getElementById('alert-message').textContent = msg;
-                const iconContainer = document.getElementById('alert-icon-container');
-                const icon = document.getElementById('alert-icon');
-                
-                if(type === 'error') {
-                    iconContainer.className = 'mx-auto w-16 h-16 bg-red-50 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4';
-                    icon.className = 'ph-fill ph-x-circle text-3xl text-red-500';
-                } else {
-                    iconContainer.className = 'mx-auto w-16 h-16 bg-blue-50 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4';
-                    icon.className = 'ph-fill ph-info text-3xl text-blue-500';
-                }
-
-                document.getElementById('modal-alert').classList.remove('hidden');
-            },
-
-            confirm: (msg, onConfirm, title = 'ยืนยันการดำเนินการ') => {
-                document.getElementById('confirm-title').textContent = title;
-                document.getElementById('confirm-message').textContent = msg;
-                document.getElementById('modal-confirm').classList.remove('hidden');
-                
-                const btnConfirm = document.getElementById('btn-confirm-action');
-                // Remove old event listeners
-                const newBtn = btnConfirm.cloneNode(true);
-                btnConfirm.parentNode.replaceChild(newBtn, btnConfirm);
-                
-                newBtn.onclick = () => {
-                    document.getElementById('modal-confirm').classList.add('hidden');
-                    if(onConfirm) onConfirm();
-                };
-            }
-        };
-
-        // Event for closing custom modals
-        document.querySelectorAll('.close-alert').forEach(b => b.onclick = () => document.getElementById('modal-alert').classList.add('hidden'));
-        document.querySelectorAll('.close-confirm').forEach(b => b.onclick = () => document.getElementById('modal-confirm').classList.add('hidden'));
-
-        // ---------------------------------------------------------
-        // 3. State & Core Logic
-        // ---------------------------------------------------------
-        let state = {
-            user: JSON.parse(localStorage.getItem('sc_v3_user')) || null,
-            theme: localStorage.getItem('sc_v3_theme') || 'light',
-            currentView: 'home',
-            currentFolderId: null,
-            folders: JSON.parse(localStorage.getItem('sc_v3_folders')) || [],
-            files: JSON.parse(localStorage.getItem('sc_v3_files')) || [],
-            searchQuery: ''
-        };
-
-        let activeFileId = null;
-        let inputModalCallback = null;
-        let activeObjectURL = null; // จำ URL สำหรับเคลียร์ RAM
-
-        const menuItems = [
-            { id: 'home', icon: 'ph-house', label: 'หน้าแรก' },
-            { id: 'all_folders', icon: 'ph-folders', label: 'โฟลเดอร์ทั้งหมด' },
-            { divider: true },
-            { id: 'cat_school', icon: 'ph-graduation-cap', label: 'งานโรงเรียน', color: 'text-orange-500' },
-            { id: 'cat_code', icon: 'ph-code', label: 'โปรเจกต์โค้ด', color: 'text-blue-500' },
-            { id: 'cat_docs', icon: 'ph-file-text', label: 'เอกสาร', color: 'text-green-500' },
-            { id: 'cat_images', icon: 'ph-image', label: 'รูปภาพ', color: 'text-purple-500' }
-        ];
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                await initDB();
-            } catch (e) {
-                UI.alert("อุปกรณ์นี้ไม่รองรับการเก็บไฟล์ขนาดใหญ่แบบ Offline โปรดอัปเดต iOS หรือเปลี่ยนเบราว์เซอร์", "ข้อผิดพลาดระบบ", "error");
-            }
-
-            applyTheme(state.theme);
-            
-            setTimeout(() => {
-                const loader = document.getElementById('loading-screen');
-                loader.classList.add('opacity-0');
-                setTimeout(() => { loader.classList.add('hidden'); checkAuth(); }, 300);
-            }, 600);
-
-            setupEvents();
-            renderSidebar();
-        });
-
-        function saveState() {
-            localStorage.setItem('sc_v3_user', JSON.stringify(state.user));
-            localStorage.setItem('sc_v3_theme', state.theme);
-            localStorage.setItem('sc_v3_folders', JSON.stringify(state.folders));
-            localStorage.setItem('sc_v3_files', JSON.stringify(state.files));
-        }
-
-        function checkAuth() {
-            if (state.user) {
-                document.getElementById('login-view').classList.add('hidden');
-                document.getElementById('main-view').classList.remove('hidden');
-                updateProfileUI();
-                renderView();
-            } else {
-                document.getElementById('login-view').classList.remove('hidden');
-                document.getElementById('main-view').classList.add('hidden');
-            }
-        }
-
-        // ---------------------------------------------------------
-        // 4. Rendering UI
-        // ---------------------------------------------------------
-        function applyTheme(theme) {
-            if(theme === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
-
-        function updateProfileUI() {
-            if(!state.user) return;
-            document.getElementById('display-username').textContent = state.user.username;
-            document.getElementById('user-avatar').textContent = state.user.username.charAt(0).toUpperCase();
-        }
-
-        function renderSidebar() {
-            const menuContainer = document.getElementById('main-menu');
-            menuContainer.innerHTML = '';
-            
-            menuItems.forEach(item => {
-                if (item.divider) {
-                    menuContainer.innerHTML += `<div class="my-3 border-t border-gray-100 dark:border-gray-800 mx-2"></div>`;
-                    return;
-                }
-                const isActive = state.currentView === item.id || (state.currentView === 'filter' && state.searchQuery === item.label);
-                const activeCls = isActive ? 'bg-indigo-50 text-primary dark:bg-indigo-900/30 dark:text-indigo-400 font-bold' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 active:bg-gray-200';
-                const iconColor = !isActive && item.color ? item.color : '';
-
-                const btn = document.createElement('button');
-                btn.className = `w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all text-sm mb-1 ${activeCls}`;
-                btn.innerHTML = `<i class="ph-fill ${item.icon} text-xl ${iconColor}"></i> <span class="flex-1 text-left">${item.label}</span>`;
-                btn.onclick = () => {
-                    closeSidebar();
-                    if (item.id === 'home' || item.id === 'all_folders') {
-                        state.currentView = item.id;
-                        state.currentFolderId = null;
-                    } else {
-                        state.currentView = 'filter';
-                        state.searchQuery = item.label;
-                    }
-                    renderSidebar(); renderView();
-                };
-                menuContainer.appendChild(btn);
-            });
-        }
-
-        function renderView() {
-            const els = {
-                title: document.getElementById('view-title'),
-                subtitle: document.getElementById('view-subtitle'),
-                breadcrumb: document.getElementById('breadcrumb'),
-                breadcrumbCurrent: document.getElementById('breadcrumb-current'),
-                folderSec: document.getElementById('section-folders'),
-                fileSec: document.getElementById('section-files'),
-                folderGrid: document.getElementById('folders-grid'),
-                fileGrid: document.getElementById('files-grid'),
-                noFilesMsg: document.getElementById('no-files-msg'),
-                folderActions: document.getElementById('folder-actions')
-            };
-
-            els.breadcrumb.classList.add('hidden');
-            els.folderSec.classList.remove('hidden');
-            els.folderActions.classList.remove('hidden');
-            
-            let displayFolders = [];
-            let displayFiles = [];
-
-            if (state.currentView === 'home') {
-                els.title.textContent = 'หน้าแรก';
-                els.subtitle.textContent = 'ไฟล์และโฟลเดอร์ล่าสุดของคุณ';
-                displayFolders = state.folders;
-                displayFiles = state.files.filter(f => !f.folderId).sort((a,b)=>b.createdAt - a.createdAt);
-            } else if (state.currentView === 'all_folders') {
-                els.title.textContent = 'โฟลเดอร์ทั้งหมด';
-                els.subtitle.textContent = 'จัดการโฟลเดอร์ของคุณ';
-                displayFolders = state.folders;
-                els.fileSec.classList.add('hidden');
-            } else if (state.currentView === 'folder' && state.currentFolderId) {
-                const folder = state.folders.find(f => f.id === state.currentFolderId);
-                els.title.textContent = folder ? folder.name : 'ไม่พบโฟลเดอร์';
-                els.subtitle.textContent = folder ? `สร้างเมื่อ ${formatDate(folder.createdAt)}` : '';
-                els.breadcrumb.classList.remove('hidden');
-                els.breadcrumbCurrent.textContent = folder ? folder.name : '';
-                els.folderSec.classList.add('hidden');
-                els.folderActions.classList.add('hidden');
-                displayFiles = state.files.filter(f => f.folderId === state.currentFolderId);
-            } else if (state.currentView === 'filter') {
-                els.title.textContent = `หมวดหมู่: ${state.searchQuery}`;
-                els.subtitle.textContent = 'จัดกลุ่มตามประเภทไฟล์';
-                els.folderSec.classList.add('hidden');
-                els.folderActions.classList.add('hidden');
-                displayFiles = state.files.filter(f => f.aiCategory === state.searchQuery);
-            }
-
-            if(state.currentView !== 'all_folders') els.fileSec.classList.remove('hidden');
-
-            // Render Folders
-            els.folderGrid.innerHTML = '';
-            displayFolders.forEach(folder => {
-                const count = state.files.filter(f => f.folderId === folder.id).length;
-                const div = document.createElement('div');
-                div.className = 'bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-2xl p-4 cursor-pointer active:scale-95 transition-transform flex items-center gap-4 shadow-sm';
-                div.innerHTML = `
-                    <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-primary rounded-xl flex items-center justify-center text-3xl">
-                        <i class="ph-fill ph-folder"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-bold text-gray-800 dark:text-gray-200 truncate">${folder.name}</h4>
-                        <p class="text-xs text-gray-500">${count} ไฟล์</p>
-                    </div>
-                `;
-                div.onclick = () => {
-                    state.currentView = 'folder';
-                    state.currentFolderId = folder.id;
-                    renderSidebar(); renderView();
-                };
-                els.folderGrid.appendChild(div);
-            });
-            if(displayFolders.length === 0 && state.currentView !== 'all_folders') els.folderSec.classList.add('hidden');
-
-            // Render Files
-            els.fileGrid.innerHTML = '';
-            if (displayFiles.length === 0) {
-                els.fileGrid.classList.add('hidden');
-                els.noFilesMsg.classList.remove('hidden');
-            } else {
-                els.fileGrid.classList.remove('hidden');
-                els.noFilesMsg.classList.add('hidden');
-                
-                displayFiles.forEach(file => {
-                    const icon = getFileIcon(file.name);
-                    const isImg = file.type.startsWith('image/');
-                    
-                    const div = document.createElement('div');
-                    div.className = 'bg-white dark:bg-darkcard border border-gray-100 dark:border-gray-800 rounded-2xl p-3 flex items-center gap-4 shadow-sm relative group';
-                    div.innerHTML = `
-                        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl cursor-pointer bg-gray-50 dark:bg-gray-800 flex-shrink-0" onclick="handleFileClick('${file.id}')">
-                            ${isImg ? `<i class="ph-fill ph-image text-purple-500"></i>` : `<i class="${icon.iconClass} ${icon.textClass}"></i>`}
-                        </div>
-                        <div class="flex-1 min-w-0 cursor-pointer py-1" onclick="handleFileClick('${file.id}')">
-                            <h4 class="font-medium text-sm text-gray-800 dark:text-gray-200 truncate">${file.name}</h4>
-                            <div class="text-xs text-gray-500 mt-0.5">${formatSize(file.size)} • ${formatDate(file.createdAt)}</div>
-                        </div>
-                        <button class="p-3 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 active:bg-gray-100 dark:active:bg-gray-800 rounded-xl transition-colors" onclick="openFileAction('${file.id}')">
-                            <i class="ph-bold ph-dots-three-vertical text-xl"></i>
-                        </button>
-                    `;
-                    els.fileGrid.appendChild(div);
-                });
-            }
-        }
-
-        // ---------------------------------------------------------
-        // 5. File Operations (Upload, Preview)
-        // ---------------------------------------------------------
-        async function processUpload(fileList) {
-            UI.toast(`กำลังประมวลผล ${fileList.length} ไฟล์...`, 'info');
-            
-            let successCount = 0;
-            for (let i = 0; i < fileList.length; i++) {
-                const file = fileList[i];
-                const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                
-                try {
-                    await saveFileBlob(fileId, file);
-                    const newFile = {
-                        id: fileId,
-                        name: file.name,
-                        size: file.size,
-                        type: file.type || getFallbackType(file.name), // iPad sometimes misses type
-                        folderId: state.currentFolderId,
-                        createdAt: Date.now(),
-                        aiCategory: getAICategory(file.name)
-                    };
-                    state.files.push(newFile);
-                    successCount++;
-                } catch (e) {
-                    console.error("Upload error", e);
-                }
-            }
-
-            saveState();
-            renderView();
-            
-            if(successCount === fileList.length) {
-                UI.toast(`บันทึกสำเร็จ ${successCount} ไฟล์!`, 'success');
-            } else {
-                UI.alert(`บันทึกได้ ${successCount}/${fileList.length} ไฟล์ พื้นที่เครื่องอาจเต็ม`, 'อัปโหลดไม่สมบูรณ์', 'error');
-            }
-        }
-
-        window.handleFileClick = (fileId) => {
-            openFilePreview(fileId);
-        };
-
-        async function openFilePreview(fileId) {
-            const fileMeta = state.files.find(f => f.id === fileId);
-            if (!fileMeta) return;
-
-            document.getElementById('preview-filename').textContent = fileMeta.name;
-            document.getElementById('preview-meta').textContent = `${formatSize(fileMeta.size)} • ${fileMeta.aiCategory}`;
-            const contentDiv = document.getElementById('preview-content');
-            
-            contentDiv.innerHTML = `<div class="loader"></div>`;
-            document.getElementById('modal-preview-file').classList.remove('hidden');
-
-            try {
-                const fileBlob = await getFileBlob(fileId);
-                if (!fileBlob) throw new Error("File missing in DB");
-
-                contentDiv.innerHTML = ''; // Clear loader
-                
-                // Revoke old URL if exists to save RAM
-                if(activeObjectURL) URL.revokeObjectURL(activeObjectURL);
-                activeObjectURL = URL.createObjectURL(fileBlob);
-
-                const type = fileMeta.type.toLowerCase();
-                const ext = fileMeta.name.split('.').pop().toLowerCase();
-
-                if (type.startsWith('image/')) {
-                    const img = document.createElement('img');
-                    img.src = activeObjectURL;
-                    contentDiv.appendChild(img);
-                } else if (type === 'application/pdf' || ext === 'pdf') {
-                    const iframe = document.createElement('iframe');
-                    iframe.src = activeObjectURL;
-                    contentDiv.appendChild(iframe);
-                } else if (type.startsWith('text/') || ['js','html','css','json','txt','py','cpp','csv'].includes(ext)) {
-                    const text = await fileBlob.text();
-                    const pre = document.createElement('pre');
-                    pre.textContent = text;
-                    contentDiv.appendChild(pre);
-                } else {
-                    contentDiv.innerHTML = `
-                        <div class="text-center text-white bg-white/5 p-8 rounded-2xl border border-white/10">
-                            <i class="ph-duotone ph-file-dashed text-6xl mb-4 opacity-50 block"></i>
-                            <h4 class="text-xl font-bold mb-2">ไม่สามารถเปิดดูตัวอย่างได้</h4>
-                            <p class="text-gray-400 text-sm">เบราว์เซอร์ไม่รองรับการเปิดไฟล์นามสกุล .${ext} โดยตรง</p>
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                contentDiv.innerHTML = `
-                    <div class="text-center text-red-400">
-                        <i class="ph-fill ph-warning-circle text-5xl mb-3 block"></i>
-                        <p>ไฟล์ต้นฉบับสูญหายหรือไม่สามารถอ่านได้</p>
-                    </div>`;
-            }
-        }
-
-        // ---------------------------------------------------------
-        // 6. Action Menu (Rename, Move, Copy, Delete)
-        // ---------------------------------------------------------
-        window.openFileAction = (fileId) => {
-            activeFileId = fileId;
-            const file = state.files.find(f => f.id === fileId);
-            document.getElementById('action-filename').textContent = file.name;
-            
-            const iconData = getFileIcon(file.name);
-            const iconBox = document.getElementById('action-icon-box');
-            if(file.type.startsWith('image/')) {
-                iconBox.innerHTML = `<i class="ph-fill ph-image text-purple-500 text-2xl"></i>`;
-            } else {
-                iconBox.innerHTML = `<i class="${iconData.iconClass} ${iconData.textClass} text-2xl"></i>`;
-            }
-            
-            document.getElementById('modal-file-actions').classList.remove('hidden');
-        };
-
-        // --- Rename ---
-        document.getElementById('btn-action-rename').onclick = () => {
-            closeAllModals();
-            const file = state.files.find(f => f.id === activeFileId);
-            openInputModal('เปลี่ยนชื่อไฟล์', file.name, (newName) => {
-                if(newName && newName !== file.name) {
-                    file.name = newName;
-                    file.aiCategory = getAICategory(newName); // อัปเดตหมวดหมู่เผื่อเปลี่ยนนามสกุล
-                    saveState();
-                    renderView();
-                    UI.toast('เปลี่ยนชื่อไฟล์สำเร็จ');
-                }
-            });
-        };
-
-        // --- Move / Copy Helper ---
-        const openFolderSelect = (title, onSelect) => {
-            closeAllModals();
-            document.getElementById('select-folder-title').textContent = title;
-            const listDiv = document.getElementById('select-folder-list');
-            listDiv.innerHTML = '';
-            
-            const createBtn = (label, iconCls, folderId) => {
-                const btn = document.createElement('button');
-                btn.className = 'w-full text-left p-3.5 rounded-xl bg-white dark:bg-darkcard border border-gray-200 dark:border-gray-700 font-medium active:bg-indigo-50 flex items-center gap-3 transition-colors mb-2';
-                btn.innerHTML = `<div class="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center"><i class="${iconCls}"></i></div> <span>${label}</span>`;
-                btn.onclick = () => { closeAllModals(); onSelect(folderId); };
-                listDiv.appendChild(btn);
-            };
-
-            createBtn('หน้าแรก (นอกโฟลเดอร์)', 'ph-fill ph-house text-primary', null);
-            state.folders.forEach(f => createBtn(f.name, 'ph-fill ph-folder text-indigo-500', f.id));
-            
-            document.getElementById('modal-select-folder').classList.remove('hidden');
-        };
-
-        // --- Move ---
-        document.getElementById('btn-action-move').onclick = () => {
-            openFolderSelect('เลือกที่อยู่ใหม่ให้ไฟล์', (targetFolderId) => {
-                const file = state.files.find(f => f.id === activeFileId);
-                if(file.folderId === targetFolderId) return UI.toast('ไฟล์อยู่ในโฟลเดอร์นี้อยู่แล้ว', 'info');
-                
-                file.folderId = targetFolderId;
-                saveState(); renderView();
-                UI.toast('ย้ายไฟล์สำเร็จ');
-            });
-        };
-
-        // --- Copy ---
-        document.getElementById('btn-action-copy').onclick = () => {
-            openFolderSelect('คัดลอกไปที่...', async (targetFolderId) => {
-                const sourceFile = state.files.find(f => f.id === activeFileId);
-                UI.toast('กำลังคัดลอก...', 'info');
-                
-                try {
-                    const blob = await getFileBlob(sourceFile.id);
-                    if(!blob) throw new Error("No blob");
-
-                    const newId = 'file_copy_' + Date.now();
-                    await saveFileBlob(newId, blob);
-
-                    // Deep copy object to avoid reference bugs
-                    const newMeta = JSON.parse(JSON.stringify(sourceFile));
-                    newMeta.id = newId;
-                    newMeta.folderId = targetFolderId;
-                    newMeta.createdAt = Date.now();
-                    
-                    if(targetFolderId === sourceFile.folderId) {
-                        const parts = newMeta.name.split('.');
-                        if(parts.length > 1) {
-                            const ext = parts.pop();
-                            newMeta.name = parts.join('.') + ' (Copy).' + ext;
-                        } else {
-                            newMeta.name += ' (Copy)';
-                        }
-                    }
-
-                    state.files.push(newMeta);
-                    saveState(); renderView();
-                    UI.toast('คัดลอกไฟล์เสร็จสมบูรณ์');
-                } catch(e) {
-                    UI.alert('เกิดข้อผิดพลาดในการเข้าถึงไฟล์ต้นฉบับ', 'ล้มเหลว', 'error');
-                }
-            });
-        };
-
-        // --- Delete ---
-        document.getElementById('btn-action-delete').onclick = () => {
-            closeAllModals();
-            UI.confirm('ไฟล์นี้จะถูกลบออกจากเครื่องและไม่สามารถกู้คืนได้ ยืนยันหรือไม่?', async () => {
-                const idx = state.files.findIndex(f => f.id === activeFileId);
-                if(idx > -1) {
-                    await deleteFileBlob(activeFileId);
-                    state.files.splice(idx, 1);
-                    saveState(); renderView();
-                    UI.toast('ลบไฟล์เรียบร้อย');
-                }
-            });
-        };
-
-        document.getElementById('btn-action-view').onclick = () => {
-            closeAllModals(); openFilePreview(activeFileId);
-        };
-
-        // ---------------------------------------------------------
-        // 7. Event Listeners General
-        // ---------------------------------------------------------
-        function setupEvents() {
-            // Login
-            document.getElementById('login-form').onsubmit = (e) => {
-                e.preventDefault();
-                state.user = { username: document.getElementById('username').value.trim() };
-                saveState(); checkAuth();
-            };
-            
-            // Logout
-            document.getElementById('btn-logout').onclick = () => {
-                UI.confirm('ต้องการออกจากระบบใช่หรือไม่?', () => {
-                    state.user = null; saveState(); checkAuth();
-                });
-            };
-
-            // Theme Toggle
-            document.getElementById('theme-toggle').onclick = () => {
-                state.theme = state.theme === 'light' ? 'dark' : 'light';
-                applyTheme(state.theme); saveState();
-            };
-
-            // Sidebar toggles
-            document.getElementById('open-sidebar').onclick = () => {
-                document.getElementById('sidebar').classList.remove('-translate-x-full');
-                document.getElementById('sidebar-overlay').classList.remove('hidden');
-            };
-            document.getElementById('close-sidebar').onclick = closeSidebar;
-            document.getElementById('sidebar-overlay').onclick = closeSidebar;
-
-            // Nav Home
-            document.querySelectorAll('.btn-nav-home').forEach(btn => btn.onclick = () => {
-                state.currentView = 'home'; state.currentFolderId = null;
-                renderSidebar(); renderView();
-            });
-
-            // Upload Triggers
-            document.getElementById('btn-upload-nav').onclick = () => document.getElementById('file-input').click();
-            document.body.addEventListener('click', (e) => {
-                if(e.target.closest('.btn-trigger-upload')) document.getElementById('file-input').click();
-            });
-            document.getElementById('file-input').onchange = (e) => {
-                if (e.target.files.length > 0) processUpload(e.target.files);
-                e.target.value = ''; // Reset input
-            };
-
-            // Folders creation
-            document.getElementById('btn-create-folder').onclick = () => {
-                openInputModal('ตั้งชื่อโฟลเดอร์ใหม่', '', (name) => {
-                    if(name) {
-                        state.folders.push({ id: 'folder_' + Date.now(), name: name, createdAt: Date.now() });
-                        saveState(); renderView(); UI.toast('สร้างโฟลเดอร์แล้ว');
-                    }
-                });
-            };
-
-            // Profile Settings
-            document.getElementById('btn-open-settings').onclick = () => {
-                closeSidebar();
-                document.getElementById('settings-username').value = state.user.username;
-                document.getElementById('modal-settings').classList.remove('hidden');
-            };
-            
-            document.getElementById('btn-save-settings').onclick = () => {
-                const name = document.getElementById('settings-username').value.trim();
-                if(name) {
-                    state.user.username = name;
-                    saveState(); updateProfileUI(); closeAllModals();
-                    UI.toast('อัปเดตโปรไฟล์แล้ว');
-                }
-            };
-            
-            document.getElementById('btn-clear-alldata').onclick = () => {
-                UI.confirm('ข้อมูลและไฟล์ทั้งหมดจะถูกลบออกจากเครื่อง iPad อย่างถาวร ยืนยันหรือไม่?', async () => {
-                    closeAllModals();
-                    UI.toast('กำลังล้างข้อมูล...', 'info');
-                    await clearAllDB();
-                    localStorage.removeItem('sc_v3_user');
-                    localStorage.removeItem('sc_v3_theme');
-                    localStorage.removeItem('sc_v3_folders');
-                    localStorage.removeItem('sc_v3_files');
-                    setTimeout(() => location.reload(), 1000);
-                }, 'ล้างข้อมูลแอป');
-            };
-
-            // Close Modals logic
-            document.querySelectorAll('.close-modal').forEach(btn => btn.onclick = closeAllModals);
-            
-            // Preview specific close
-            document.querySelector('.close-preview').onclick = () => {
-                document.getElementById('modal-preview-file').classList.add('hidden');
-                document.getElementById('preview-content').innerHTML = ''; // free ram
-                if(activeObjectURL) { URL.revokeObjectURL(activeObjectURL); activeObjectURL = null; }
-            };
-
-            // Input Modal Confirm
-            document.getElementById('modal-input-confirm').onclick = () => {
-                const val = document.getElementById('modal-input-field').value.trim();
-                if(inputModalCallback) inputModalCallback(val);
-                closeAllModals();
-            };
-        }
-
-        function closeSidebar() {
-            document.getElementById('sidebar').classList.add('-translate-x-full');
-            document.getElementById('sidebar-overlay').classList.add('hidden');
-        }
-
-        function closeAllModals() {
-            document.querySelectorAll('[id^="modal-"]:not(#modal-alert):not(#modal-confirm)').forEach(m => m.classList.add('hidden'));
-            document.getElementById('modal-input-field').value = '';
-        }
-
-        function openInputModal(title, defaultValue, callback) {
-            document.getElementById('modal-input-title').textContent = title;
-            const input = document.getElementById('modal-input-field');
-            input.value = defaultValue;
-            inputModalCallback = callback;
-            document.getElementById('modal-input').classList.remove('hidden');
-            setTimeout(() => input.focus(), 100);
-        }
-
-        // ---------------------------------------------------------
-        // 8. Utilities
-        // ---------------------------------------------------------
-        function getAICategory(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if (['html', 'css', 'js', 'py', 'java', 'cpp', 'json'].includes(ext)) return 'โปรเจกต์โค้ด';
-            if (['pdf', 'doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return 'เอกสาร';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'รูปภาพ';
-            return 'งานโรงเรียน';
-        }
-
-        function getFileIcon(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if (['html', 'css', 'js', 'py'].includes(ext)) return { iconClass: 'ph-fill ph-file-code', textClass: 'text-blue-500' };
-            if (['pdf'].includes(ext)) return { iconClass: 'ph-fill ph-file-pdf', textClass: 'text-red-500' };
-            if (['doc', 'docx', 'txt'].includes(ext)) return { iconClass: 'ph-fill ph-file-text', textClass: 'text-green-600' };
-            if (['zip', 'rar'].includes(ext)) return { iconClass: 'ph-fill ph-file-archive', textClass: 'text-yellow-600' };
-            return { iconClass: 'ph-fill ph-file', textClass: 'text-gray-500' };
-        }
-
-        function getFallbackType(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if(['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image/' + ext;
-            if(ext === 'pdf') return 'application/pdf';
-            if(['txt','html','css','js'].includes(ext)) return 'text/plain';
-            return 'application/octet-stream';
-        }
-
-        function formatSize(bytes) {
-            if(!bytes) return '0 B';
-            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
-
-        function formatDate(timestamp) {
-            const date = new Date(timestamp);
-            return `${date.getDate().toString().padStart(2,'0')}/${(date.getMonth()+1).toString().padStart(2,'0')}/${date.getFullYear() + 543}`;
-        }
-    </script>
-</body>
-</html>
-
+  );
+}
 
