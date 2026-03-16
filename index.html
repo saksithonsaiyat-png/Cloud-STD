@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudentCloud - Secure Local Storage</title>
+    <title>StudentCloud - High Capacity Local Storage</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -23,13 +23,10 @@
         }
     </script>
     <style>
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
-        
-        /* Utility classes */
         .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
         .dark .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(10px); }
         .hide { display: none !important; }
@@ -43,15 +40,15 @@
     <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- ========================================== -->
-    <!-- VIEW 1: SETUP (ตั้งรหัสผ่านครั้งแรก) -->
+    <!-- VIEW 1: SETUP -->
     <!-- ========================================== -->
     <div id="view-setup" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
         <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 fade-in text-center">
             <div class="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
-                <i data-lucide="shield-check" class="w-10 h-10"></i>
+                <i data-lucide="hard-drive" class="w-10 h-10"></i>
             </div>
             <h1 class="text-2xl font-bold mb-2">ยินดีต้อนรับสู่ StudentCloud</h1>
-            <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">ดูเหมือนคุณจะใช้งานครั้งแรก กรุณาตั้งรหัสผ่านเพื่อรักษาความปลอดภัยไฟล์ของคุณ</p>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">เวอร์ชันจัดเก็บความจุสูง (IndexedDB) กรุณาตั้งรหัสผ่านเพื่อล็อกไฟล์ของคุณ</p>
             
             <form id="form-setup" class="space-y-4 text-left">
                 <div>
@@ -70,7 +67,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- VIEW 2: LOGIN (เข้าสู่ระบบ) -->
+    <!-- VIEW 2: LOGIN -->
     <!-- ========================================== -->
     <div id="view-login" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
         <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 fade-in text-center">
@@ -92,7 +89,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- VIEW 3: MAIN APP (หน้าหลัก) -->
+    <!-- VIEW 3: MAIN APP -->
     <!-- ========================================== -->
     <div id="view-app" class="hide w-full h-full flex">
         
@@ -124,15 +121,15 @@
 
             <div class="p-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
                 <!-- Storage Info -->
-                <div class="mb-4 px-2">
-                    <div class="flex justify-between text-xs mb-1">
-                        <span class="font-semibold text-gray-500">พื้นที่ (Local)</span>
-                        <span id="storage-text" class="font-bold text-indigo-600">0%</span>
+                <div class="mb-4 px-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <div class="flex items-center gap-2 mb-1">
+                        <i data-lucide="database" class="w-4 h-4 text-indigo-500"></i>
+                        <span class="text-xs font-bold text-gray-600 dark:text-gray-300">พื้นที่เก็บข้อมูล (IndexedDB)</span>
                     </div>
-                    <div class="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-1.5">
-                        <div id="storage-bar" class="bg-indigo-600 h-1.5 rounded-full" style="width: 0%"></div>
+                    <div class="flex items-baseline gap-1">
+                        <span id="storage-text" class="text-lg font-bold text-indigo-600 dark:text-indigo-400">0 MB</span>
+                        <span class="text-[10px] text-gray-400">ใช้งานไปแล้ว</span>
                     </div>
-                    <p class="text-[9px] text-gray-400 mt-1 text-center">*บันทึกในเบราว์เซอร์ ล้างแคชไฟล์จะหาย</p>
                 </div>
 
                 <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-sm font-medium transition-colors">
@@ -146,7 +143,6 @@
 
         <!-- Main Content -->
         <main class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 relative">
-            <!-- Mobile Sidebar Overlay -->
             <div id="sidebar-overlay" class="hide fixed inset-0 bg-black/50 z-10 md:hidden" onclick="toggleSidebar()"></div>
 
             <!-- Header -->
@@ -164,28 +160,32 @@
                     <button onclick="document.getElementById('file-upload').click()" class="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all">
                         <i data-lucide="upload" class="w-4 h-4"></i> อัปโหลด
                     </button>
+                    <!-- Max limit removed from input, checked in JS -->
                     <input type="file" id="file-upload" multiple class="hidden" onchange="handleFileUpload(event)">
                 </div>
             </header>
 
             <!-- File Grid Area -->
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24">
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 relative" id="drop-zone">
                 
-                <!-- Breadcrumb -->
+                <!-- Loading Overlay during heavy upload -->
+                <div id="upload-loading" class="hide absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
+                    <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p class="font-bold text-lg text-indigo-600 dark:text-indigo-400">กำลังจัดเก็บไฟล์เข้าระบบ...</p>
+                </div>
+
                 <div id="breadcrumb" class="hide flex items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-gray-900 w-fit px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-800">
                     <span class="hover:text-indigo-600 cursor-pointer flex items-center gap-1" onclick="navigateTo(null)"><i data-lucide="home" class="w-4 h-4"></i> หน้าแรก</span>
                     <i data-lucide="chevron-right" class="w-4 h-4"></i>
                     <span class="font-bold text-gray-900 dark:text-white flex items-center gap-1" id="breadcrumb-current"><i data-lucide="folder" class="w-4 h-4"></i> <span></span></span>
                 </div>
 
-                <!-- Empty State -->
-                <div id="empty-state" class="hide h-full flex flex-col items-center justify-center text-center opacity-50 mt-20">
-                    <i data-lucide="folder-open" class="w-20 h-20 mb-4"></i>
+                <div id="empty-state" class="hide h-full flex flex-col items-center justify-center text-center opacity-50 mt-20 pointer-events-none">
+                    <i data-lucide="hard-drive-upload" class="w-20 h-20 mb-4 text-indigo-500"></i>
                     <h3 class="text-xl font-bold">พื้นที่ว่างเปล่า</h3>
-                    <p class="text-sm mt-2">กดปุ่มอัปโหลดด้านบนเพื่อเพิ่มไฟล์</p>
+                    <p class="text-sm mt-2">กดปุ่มอัปโหลดด้านบนเพื่อเพิ่มไฟล์ (สูงสุด 50MB/ไฟล์)</p>
                 </div>
 
-                <!-- Grid -->
                 <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <!-- Cards injected via JS -->
                 </div>
@@ -207,7 +207,7 @@
             
             <div class="flex flex-col items-center mb-6">
                 <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-upload').click()">
-                    <img id="profile-modal-avatar" src="" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 dark:border-gray-700 shadow-md">
+                    <img id="profile-modal-avatar" src="" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 dark:border-gray-700 shadow-md bg-white">
                     <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <i data-lucide="camera" class="text-white w-8 h-8"></i>
                     </div>
@@ -249,7 +249,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <button id="btn-download" class="p-2 hover:bg-white/10 rounded-lg flex items-center gap-2 text-sm"><i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">โหลด</span></button>
+                <button id="btn-download" class="p-2 hover:bg-white/10 rounded-lg flex items-center gap-2 text-sm"><i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">โหลดเก็บไว้</span></button>
                 <button onclick="closeModal('modal-preview')" class="p-2 hover:bg-red-500/20 text-red-400 rounded-lg"><i data-lucide="x" class="w-6 h-6"></i></button>
             </div>
         </div>
@@ -259,13 +259,56 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- JAVASCRIPT LOGIC (WITH IndexedDB) -->
     <!-- ========================================== -->
     <script>
-        // --- 1. State Management ---
-        const DB_KEY = 'studentCloud_v5';
-        const MAX_STORAGE_MB = 4.5; // Set limit to prevent crashing localStorage
-        
+        // --- 1. IndexedDB Wrapper (High Capacity Engine) ---
+        const DB_NAME = 'StudentCloudDB_V6';
+        const STORE_NAME = 'CloudStore';
+        let db;
+
+        // Initialize connection to browser's deep storage
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME);
+                    }
+                };
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    resolve();
+                };
+                request.onerror = (event) => {
+                    console.error("IndexedDB error:", event.target.errorCode);
+                    reject(event.target.error);
+                };
+            });
+        };
+
+        const idbSet = (key, value) => {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(value, key);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        };
+
+        const idbGet = (key) => {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(key);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        };
+
+        // --- 2. State Management ---
         let state = {
             password: null,
             user: {
@@ -273,22 +316,27 @@
                 avatar: 'https://ui-avatars.com/api/?name=St&background=6366f1&color=fff'
             },
             theme: 'light',
-            folders: [], // { id, name, parentId }
-            files: []    // { id, name, size, type, data(base64), folderId, date }
+            folders: [],
+            files: []
         };
 
         let currentFolderId = null;
         let isAuthenticated = false;
 
-        // --- 2. Initialize App ---
-        function init() {
-            loadData();
+        // --- 3. App Initialization ---
+        async function init() {
+            try {
+                await initDB();
+                await loadData();
+            } catch (err) {
+                showToast("ไม่สามารถเชื่อมต่อฐานข้อมูล IndexedDB ได้ (อาจใช้โหมดไม่ระบุตัวตน)", "error");
+            }
+
             applyTheme();
             
             if (!state.password) {
                 showView('view-setup');
             } else if (!isAuthenticated) {
-                // Prepare login screen data
                 document.getElementById('login-name').innerText = `สวัสดี, ${state.user.name}`;
                 document.getElementById('login-avatar').src = state.user.avatar;
                 showView('view-login');
@@ -299,57 +347,49 @@
             lucide.createIcons();
         }
 
-        // --- 3. Storage Functions ---
-        function loadData() {
-            const saved = localStorage.getItem(DB_KEY);
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    state = { ...state, ...parsed };
-                } catch(e) { console.error("Data corrupted", e); }
-            }
+        // --- 4. Data Operations ---
+        async function loadData() {
+            try {
+                const saved = await idbGet('appState');
+                if (saved) state = { ...state, ...saved };
+            } catch(e) { console.error("Data load failed", e); }
         }
 
-        function saveData() {
+        async function saveData() {
             try {
-                localStorage.setItem(DB_KEY, JSON.stringify(state));
-                updateStorageIndicator();
+                await idbSet('appState', state);
+                await updateStorageIndicator();
                 return true;
             } catch (e) {
-                if (e.name === 'QuotaExceededError') {
-                    showToast('พื้นที่เบราว์เซอร์เต็ม! กรุณาลบไฟล์บางส่วน', 'error');
-                } else {
-                    showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
-                }
+                showToast('พื้นที่เบราว์เซอร์อาจจะเต็ม! กรุณาลบไฟล์บางส่วน', 'error');
                 return false;
             }
         }
 
-        function updateStorageIndicator() {
+        async function updateStorageIndicator() {
             if(!isAuthenticated) return;
-            const dataStr = localStorage.getItem(DB_KEY) || '';
-            const bytes = new Blob([dataStr]).size;
-            const mb = bytes / (1024 * 1024);
-            const percent = Math.min((mb / MAX_STORAGE_MB) * 100, 100);
-            
-            document.getElementById('storage-bar').style.width = `${percent}%`;
-            document.getElementById('storage-text').innerText = `${percent.toFixed(1)}%`;
-            
-            if(percent > 90) document.getElementById('storage-bar').classList.replace('bg-indigo-600', 'bg-red-500');
-            else document.getElementById('storage-bar').classList.replace('bg-red-500', 'bg-indigo-600');
+            try {
+                if (navigator.storage && navigator.storage.estimate) {
+                    const estimate = await navigator.storage.estimate();
+                    const usedMB = (estimate.usage / (1024 * 1024)).toFixed(1);
+                    document.getElementById('storage-text').innerText = `${usedMB} MB`;
+                } else {
+                    document.getElementById('storage-text').innerText = 'ใช้งานอยู่';
+                }
+            } catch(e) { console.log(e); }
         }
 
-        // --- 4. Authentication Logic ---
-        document.getElementById('form-setup').addEventListener('submit', (e) => {
+        // --- 5. Authentication Logic ---
+        document.getElementById('form-setup').addEventListener('submit', async (e) => {
             e.preventDefault();
             const pass = document.getElementById('setup-pass').value;
             const conf = document.getElementById('setup-confirm').value;
             if (pass !== conf) return showToast('รหัสผ่านไม่ตรงกัน!', 'error');
             
-            state.password = btoa(pass); // Simple encode (not secure encryption, but enough for local barrier)
+            state.password = btoa(pass); 
             isAuthenticated = true;
-            saveData();
-            showToast('ตั้งค่าสำเร็จ!', 'success');
+            await saveData();
+            showToast('สร้างรหัสผ่านและความปลอดภัยสำเร็จ!', 'success');
             init();
         });
 
@@ -373,17 +413,18 @@
         }
 
         function resetDataConfirm() {
-            if(confirm('คำเตือน: การรีเซ็ตจะลบ "ไฟล์ทั้งหมด" และรหัสผ่านของคุณ คุณแน่ใจหรือไม่?')) {
-                localStorage.removeItem(DB_KEY);
-                location.reload();
+            if(confirm('🚨 คำเตือนขั้นเด็ดขาด: การกระทำนี้จะลบ "ไฟล์ทั้งหมด" ทิ้งอย่างถาวร ยืนยันหรือไม่?')) {
+                const req = indexedDB.deleteDatabase(DB_NAME);
+                req.onsuccess = () => location.reload();
+                req.onerror = () => { localStorage.clear(); location.reload(); }
             }
         }
 
-        // --- 5. Profile Management ---
+        // --- 6. Profile Management ---
         function handleAvatarChange(e) {
             const file = e.target.files[0];
             if (!file) return;
-            if (file.size > 500 * 1024) return showToast('รูปโปรไฟล์ต้องขนาดไม่เกิน 500KB', 'error');
+            if (file.size > 2 * 1024 * 1024) return showToast('รูปโปรไฟล์ควรมีขนาดไม่เกิน 2MB', 'error');
 
             const reader = new FileReader();
             reader.onload = (event) => {
@@ -392,22 +433,22 @@
             reader.readAsDataURL(file);
         }
 
-        function saveProfile() {
+        async function saveProfile() {
             const newName = document.getElementById('profile-name-input').value.trim();
             const newAvatar = document.getElementById('profile-modal-avatar').src;
             
             if (newName) state.user.name = newName;
             state.user.avatar = newAvatar;
             
-            if(saveData()) {
+            if(await saveData()) {
                 showToast('อัปเดตโปรไฟล์แล้ว');
                 closeModal('modal-profile');
                 updateUI();
             }
         }
 
-        // --- 6. File & Folder Operations ---
-        function createFolder() {
+        // --- 7. File & Folder Operations ---
+        async function createFolder() {
             const name = document.getElementById('folder-name-input').value.trim();
             if (!name) return;
             
@@ -418,68 +459,83 @@
             };
             
             state.folders.push(newFolder);
-            if(saveData()) {
+            if(await saveData()) {
                 document.getElementById('folder-name-input').value = '';
                 closeModal('modal-create-folder');
                 showToast(`สร้างโฟลเดอร์ "${name}" แล้ว`);
                 updateUI();
             } else {
-                state.folders.pop(); // Revert if save failed
+                state.folders.pop(); 
             }
         }
 
-        function handleFileUpload(e) {
+        async function handleFileUpload(e) {
             const files = e.target.files;
             if (!files.length) return;
 
-            Array.from(files).forEach(file => {
-                // Check single file size limit (~1.5MB for local storage safety)
-                if (file.size > 1.5 * 1024 * 1024) {
-                    return showToast(`ไฟล์ ${file.name} ใหญ่เกิน 1.5MB (ข้อจำกัดเบราว์เซอร์)`, 'error');
+            document.getElementById('upload-loading').classList.remove('hide');
+
+            for(let i=0; i<files.length; i++) {
+                const file = files[i];
+                
+                // 🔥 NEW LIMIT: 50MB per file
+                if (file.size > 50 * 1024 * 1024) {
+                    showToast(`ข้ามไฟล์ ${file.name} (ใหญ่เกิน 50MB)`, 'error');
+                    continue;
                 }
 
-                const reader = new FileReader();
-                reader.onload = (event) => {
+                try {
+                    const dataUrl = await readFileAsDataURL(file);
                     const newFile = {
                         id: 'fi_' + Date.now() + Math.random().toString(16).slice(2),
                         name: file.name,
                         size: file.size,
                         type: file.type || getExtType(file.name),
-                        data: event.target.result,
+                        data: dataUrl,
                         folderId: currentFolderId,
                         date: new Date().getTime()
                     };
                     
                     state.files.push(newFile);
-                    if(saveData()) {
-                        showToast(`อัปโหลด ${file.name} สำเร็จ`);
-                        updateUI();
-                    } else {
-                        state.files.pop(); // Revert
-                    }
-                };
-                reader.readAsDataURL(file);
-            });
-            e.target.value = ''; // Reset input
+                    await saveData();
+                    showToast(`อัปโหลด ${file.name} สำเร็จ`);
+                } catch (err) {
+                    showToast(`เกิดข้อผิดพลาดกับไฟล์ ${file.name}`, 'error');
+                    console.error(err);
+                }
+            }
+            
+            document.getElementById('upload-loading').classList.add('hide');
+            updateUI();
+            e.target.value = ''; 
         }
 
-        function deleteItem(id, isFolder) {
-            if(!confirm('ยืนยันการลบ?')) return;
+        // Helper for async file reading
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function deleteItem(id, isFolder) {
+            if(!confirm('ยืนยันการลบทิ้ง?')) return;
 
             if (isFolder) {
-                // Very basic cascade delete (only deletes files directly inside, not subfolders for simplicity in this version)
                 state.files = state.files.filter(f => f.folderId !== id);
                 state.folders = state.folders.filter(f => f.id !== id);
             } else {
                 state.files = state.files.filter(f => f.id !== id);
             }
             
-            saveData();
+            await saveData();
             showToast('ลบรายการสำเร็จ');
             updateUI();
         }
 
-        // --- 7. Navigation & Rendering ---
+        // --- 8. Navigation & Rendering ---
         function navigateTo(folderId) {
             currentFolderId = folderId;
             updateUI();
@@ -488,7 +544,6 @@
         function updateUI() {
             if(!isAuthenticated) return;
 
-            // Profile Info
             document.getElementById('sidebar-avatar').src = state.user.avatar;
             document.getElementById('sidebar-name').innerText = state.user.name;
             document.getElementById('profile-modal-avatar').src = state.user.avatar;
@@ -496,15 +551,12 @@
 
             updateStorageIndicator();
 
-            // Filter data for current view
             const currentFolders = state.folders.filter(f => f.parentId === currentFolderId);
             const currentFiles = state.files.filter(f => f.folderId === currentFolderId);
             const isEmpty = currentFolders.length === 0 && currentFiles.length === 0;
 
-            // Toggle Empty State
             document.getElementById('empty-state').classList.toggle('hide', !isEmpty);
             
-            // Header & Breadcrumb
             if (currentFolderId === null) {
                 document.getElementById('current-view-title').innerText = 'หน้าแรก';
                 document.getElementById('breadcrumb').classList.add('hide');
@@ -515,7 +567,6 @@
                 document.querySelector('#breadcrumb-current span').innerText = folder ? folder.name : '';
             }
 
-            // Render Sidebar Navigation
             const navHtml = [
                 `<button onclick="navigateTo(null)" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${currentFolderId === null ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="home" class="w-5 h-5"></i> หน้าแรก</button>`,
                 `<div class="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4">โฟลเดอร์ของคุณ</div>`
@@ -526,10 +577,8 @@
             });
             document.getElementById('nav-folders').innerHTML = navHtml.join('');
 
-            // Render Grid Cards
             let gridHtml = '';
             
-            // Render Folders first
             currentFolders.forEach(f => {
                 gridHtml += `
                 <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group cursor-pointer" onclick="navigateTo('${f.id}')">
@@ -544,10 +593,9 @@
                 </div>`;
             });
 
-            // Render Files
             currentFiles.forEach(f => {
-                const icon = f.type.includes('image') ? 'image' : f.type.includes('text') || f.type.includes('json') ? 'file-code' : 'file-text';
-                const colorClass = f.type.includes('image') ? 'text-purple-500 bg-purple-50 dark:bg-purple-900/30' : 'text-blue-500 bg-blue-50 dark:bg-blue-900/30';
+                const icon = f.type.includes('image') ? 'image' : f.type.includes('text') || f.type.includes('json') ? 'file-code' : f.type.includes('video') ? 'video' : 'file-text';
+                const colorClass = f.type.includes('image') ? 'text-purple-500 bg-purple-50 dark:bg-purple-900/30' : f.type.includes('video') ? 'text-pink-500 bg-pink-50 dark:bg-pink-900/30' : 'text-blue-500 bg-blue-50 dark:bg-blue-900/30';
                 
                 gridHtml += `
                 <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group">
@@ -568,7 +616,7 @@
             lucide.createIcons();
         }
 
-        // --- 8. Preview & Utility Functions ---
+        // --- 9. Preview & Utility Functions ---
         function openPreview(fileId) {
             const file = state.files.find(f => f.id === fileId);
             if(!file) return;
@@ -577,7 +625,7 @@
             document.getElementById('preview-meta').innerText = `${formatBytes(file.size)} • ${file.type}`;
             
             const contentArea = document.getElementById('preview-content');
-            contentArea.innerHTML = ''; // Clear old
+            contentArea.innerHTML = ''; 
             
             document.getElementById('btn-download').onclick = () => {
                 const a = document.createElement('a');
@@ -588,9 +636,10 @@
 
             if (file.type.includes('image')) {
                 contentArea.innerHTML = `<img src="${file.data}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">`;
+            } else if (file.type.includes('video')) {
+                contentArea.innerHTML = `<video controls class="max-w-full max-h-full rounded-lg shadow-2xl"><source src="${file.data}" type="${file.type}"></video>`;
             } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('javascript') || file.type.includes('html')) {
                 try {
-                    // Extract base64 text
                     const base64Str = file.data.split(',')[1];
                     const decodedText = decodeURIComponent(escape(window.atob(base64Str)));
                     contentArea.innerHTML = `<div class="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-green-400 border border-white/10 text-left"><pre>${decodedText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></div>`;
@@ -602,7 +651,7 @@
                     <div class="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10">
                         <i data-lucide="file-question" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
                         <h3 class="text-xl font-bold mb-2">ไม่มีตัวอย่างแสดงผล</h3>
-                        <p class="text-sm text-gray-400">กดปุ่มดาวน์โหลดด้านบนเพื่อเปิดไฟล์ในเครื่องของคุณ</p>
+                        <p class="text-sm text-gray-400">กดปุ่มโหลดเพื่อเปิดไฟล์ในเครื่องของคุณ</p>
                     </div>`;
             }
 
@@ -613,13 +662,14 @@
         function getExtType(filename) {
             const ext = filename.split('.').pop().toLowerCase();
             if(['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image/'+ext;
+            if(['mp4','webm','ogg'].includes(ext)) return 'video/'+ext;
             if(['txt','html','css','js','json','py'].includes(ext)) return 'text/plain';
             return 'application/octet-stream';
         }
 
         function formatBytes(bytes) {
             if(bytes === 0) return '0 B';
-            const k = 1024, sizes = ['B', 'KB', 'MB'], i = Math.floor(Math.log(bytes) / Math.log(k));
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'], i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }
 
@@ -639,10 +689,10 @@
             overlay.classList.toggle('hide');
         }
 
-        function toggleTheme() {
+        async function toggleTheme() {
             state.theme = state.theme === 'light' ? 'dark' : 'light';
             applyTheme();
-            saveData();
+            await saveData();
         }
 
         function applyTheme() {
@@ -656,7 +706,7 @@
             const textColor = type === 'error' ? 'text-white' : 'text-white dark:text-gray-900';
             
             toast.className = `flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all fade-in font-medium text-sm ${bgColor} ${textColor}`;
-            toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle-2'}" class="w-5 h-5 ${type === 'success' ? 'text-green-400' : ''}"></i> ${msg}`;
+            toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : type === 'info' ? 'loader' : 'check-circle-2'}" class="w-5 h-5 ${type === 'success' ? 'text-green-400' : type === 'info' ? 'animate-spin' : ''}"></i> ${msg}`;
             
             document.getElementById('toast-container').appendChild(toast);
             lucide.createIcons();
