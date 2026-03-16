@@ -1,504 +1,678 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, onSnapshot, addDoc, updateDoc, deleteDoc, query, getDoc } from 'firebase/firestore';
-import { 
-  Cloud, FolderPlus, Upload, File, Image as ImageIcon, FileCode, FileText, 
-  Trash2, Pencil, Copy, Move, MoreVertical, LayoutGrid, List, Sun, Moon,
-  LogOut, Settings, ChevronRight, Home, Info, X, CheckCircle2, AlertCircle
-} from 'lucide-react';
-
-// Firebase Configuration from environment
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'student-cloud-v4';
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState('light');
-  const [currentView, setCurrentView] = useState('home');
-  const [currentFolderId, setCurrentFolderId] = useState(null);
-  const [folders, setFolders] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [activeModal, setActiveModal] = useState(null);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [inputValue, setInputValue] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const fileInputRef = useRef(null);
-
-  // 1. Authentication
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudentCloud - Secure Local Storage</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: { primary: '#4f46e5' }
+                }
+            }
         }
-      } catch (error) {
-        showToast("ไม่สามารถเข้าสู่ระบบฐานข้อมูลได้", "error");
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // 2. Data Sync with Firestore (Rules compliant)
-  useEffect(() => {
-    if (!user) return;
-
-    // Sync Folders
-    const folderCol = collection(db, 'artifacts', appId, 'users', user.uid, 'folders');
-    const unsubFolders = onSnapshot(folderCol, (snapshot) => {
-      const folderList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setFolders(folderList);
-    }, (err) => console.error("Folder Sync Error:", err));
-
-    // Sync Files
-    const fileCol = collection(db, 'artifacts', appId, 'users', user.uid, 'files');
-    const unsubFiles = onSnapshot(fileCol, (snapshot) => {
-      const fileList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setFiles(fileList);
-    }, (err) => console.error("File Sync Error:", err));
-
-    return () => {
-      unsubFolders();
-      unsubFiles();
-    };
-  }, [user]);
-
-  // Utility: Toast
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  // Actions: Upload
-  const handleUpload = async (e) => {
-    const selectedFiles = Array.from(e.target.files);
-    if (!selectedFiles.length || !user) return;
-
-    showToast(`กำลังอัปโหลด ${selectedFiles.length} ไฟล์...`, 'info');
-
-    for (const file of selectedFiles) {
-      try {
-        // Convert file to Base64 (Using Firestore as storage for simplicity/demo)
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = async () => {
-          const base64Data = reader.result;
-          
-          const fileData = {
-            name: file.name,
-            size: file.size,
-            type: file.type || 'application/octet-stream',
-            data: base64Data, // เก็บข้อมูลไฟล์จริง
-            folderId: currentFolderId,
-            createdAt: Date.now(),
-            category: getCategory(file.name)
-          };
-
-          await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'files'), fileData);
-          showToast(`อัปโหลด ${file.name} สำเร็จ`);
-        };
-      } catch (err) {
-        showToast(`เกิดข้อผิดพลาดกับไฟล์ ${file.name}`, 'error');
-      }
-    }
-    e.target.value = null;
-  };
-
-  const getCategory = (name) => {
-    const ext = name.split('.').pop().toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'รูปภาพ';
-    if (['html', 'css', 'js', 'py', 'json'].includes(ext)) return 'โค้ด';
-    if (['pdf', 'doc', 'docx', 'txt'].includes(ext)) return 'เอกสาร';
-    return 'ทั่วไป';
-  };
-
-  const createFolder = async () => {
-    if (!inputValue.trim() || !user) return;
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'folders'), {
-        name: inputValue.trim(),
-        createdAt: Date.now()
-      });
-      setInputValue('');
-      setActiveModal(null);
-      showToast('สร้างโฟลเดอร์สำเร็จ');
-    } catch (err) {
-      showToast('สร้างโฟลเดอร์ไม่สำเร็จ', 'error');
-    }
-  };
-
-  const deleteItem = async (id, type) => {
-    if (!user) return;
-    try {
-      const collectionName = type === 'folder' ? 'folders' : 'files';
-      await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, collectionName, id));
-      setActiveModal(null);
-      showToast('ลบรายการสำเร็จ');
-    } catch (err) {
-      showToast('ลบไม่สำเร็จ', 'error');
-    }
-  };
-
-  const renameFile = async () => {
-    if (!inputValue.trim() || !user || !selectedItem) return;
-    try {
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'files', selectedItem.id), {
-        name: inputValue.trim()
-      });
-      setInputValue('');
-      setActiveModal(null);
-      showToast('เปลี่ยนชื่อสำเร็จ');
-    } catch (err) {
-      showToast('เปลี่ยนชื่อไม่สำเร็จ', 'error');
-    }
-  };
-
-  const copyFile = async () => {
-    if (!user || !selectedItem) return;
-    try {
-      const { id, ...rest } = selectedItem;
-      const copyData = { 
-        ...rest, 
-        name: rest.name + " (สำเนา)", 
-        createdAt: Date.now() 
-      };
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'files'), copyData);
-      setActiveModal(null);
-      showToast('คัดลอกไฟล์สำเร็จ');
-    } catch (err) {
-      showToast('คัดลอกไม่สำเร็จ', 'error');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-500 font-medium">กำลังเตรียมคลาวด์ส่วนตัว...</p>
-      </div>
-    );
-  }
-
-  const currentFolder = folders.find(f => f.id === currentFolderId);
-  const displayFiles = currentView === 'home' 
-    ? files.filter(f => !f.folderId)
-    : currentView === 'folder' 
-      ? files.filter(f => f.folderId === currentFolderId)
-      : files.filter(f => f.category === currentView);
-
-  return (
-    <div className={`h-screen flex flex-col ${theme === 'dark' ? 'dark bg-gray-950 text-white' : 'bg-gray-50 text-gray-900'}`}>
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all animate-bounce ${toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-gray-900 text-white'}`}>
-          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} className="text-green-400" />}
-          <span className="text-sm font-medium">{toast.message}</span>
-        </div>
-      )}
-
-      {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden">
+    </script>
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
         
-        {/* Mobile Sidebar Overlay */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
+        /* Utility classes */
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+        .dark .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(10px); }
+        .hide { display: none !important; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300 antialiased overflow-hidden h-screen flex">
 
-        {/* Sidebar */}
-        <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <div className="h-20 flex items-center px-6 gap-3">
-            <div className="p-2 bg-indigo-600 rounded-xl text-white">
-              <Cloud size={24} />
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 1: SETUP (ตั้งรหัสผ่านครั้งแรก) -->
+    <!-- ========================================== -->
+    <div id="view-setup" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
+        <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 fade-in text-center">
+            <div class="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
+                <i data-lucide="shield-check" class="w-10 h-10"></i>
             </div>
-            <span className="text-xl font-bold tracking-tight">StudentCloud</span>
-          </div>
-
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            <NavItem active={currentView === 'home'} icon={<Home size={20}/>} label="หน้าแรก" onClick={() => { setCurrentView('home'); setCurrentFolderId(null); setSidebarOpen(false); }} />
-            <div className="py-2 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">หมวดหมู่</div>
-            <NavItem active={currentView === 'รูปภาพ'} icon={<ImageIcon size={20}/>} label="รูปภาพ" onClick={() => { setCurrentView('รูปภาพ'); setSidebarOpen(false); }} />
-            <NavItem active={currentView === 'โค้ด'} icon={<FileCode size={20}/>} label="โปรเจกต์โค้ด" onClick={() => { setCurrentView('โค้ด'); setSidebarOpen(false); }} />
-            <NavItem active={currentView === 'เอกสาร'} icon={<FileText size={20}/>} label="เอกสาร" onClick={() => { setCurrentView('เอกสาร'); setSidebarOpen(false); }} />
+            <h1 class="text-2xl font-bold mb-2">ยินดีต้อนรับสู่ StudentCloud</h1>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">ดูเหมือนคุณจะใช้งานครั้งแรก กรุณาตั้งรหัสผ่านเพื่อรักษาความปลอดภัยไฟล์ของคุณ</p>
             
-            <div className="py-2 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">โฟลเดอร์</div>
-            {folders.map(f => (
-              <NavItem 
-                key={f.id} 
-                active={currentView === 'folder' && currentFolderId === f.id} 
-                icon={<FolderPlus size={20}/>} 
-                label={f.name} 
-                onClick={() => { setCurrentView('folder'); setCurrentFolderId(f.id); setSidebarOpen(false); }} 
-              />
-            ))}
-          </nav>
+            <form id="form-setup" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-sm font-semibold mb-1 ml-1">ตั้งรหัสผ่าน</label>
+                    <input type="password" id="setup-pass" required minlength="4" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="รหัสผ่านอย่างน้อย 4 ตัว">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold mb-1 ml-1">ยืนยันรหัสผ่าน</label>
+                    <input type="password" id="setup-confirm" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="กรอกรหัสผ่านอีกครั้ง">
+                </div>
+                <button type="submit" class="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-transform active:scale-95">
+                    สร้างพื้นที่ส่วนตัว
+                </button>
+            </form>
+        </div>
+    </div>
 
-          <div className="p-4 border-t border-gray-100 dark:border-gray-800">
-            <button 
-              onClick={() => { setTheme(theme === 'light' ? 'dark' : 'light'); }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              {theme === 'light' ? <Moon size={20}/> : <Sun size={20}/>}
-              <span className="text-sm font-medium">โหมด{theme === 'light' ? 'มืด' : 'สว่าง'}</span>
-            </button>
-            <div className="mt-4 flex items-center gap-3 px-4 py-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center font-bold">
-                {user?.uid.substring(0, 1).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold truncate">UID: {user?.uid.substring(0, 8)}...</p>
-                <p className="text-[10px] text-green-500 font-bold uppercase">Online</p>
-              </div>
+    <!-- ========================================== -->
+    <!-- VIEW 2: LOGIN (เข้าสู่ระบบ) -->
+    <!-- ========================================== -->
+    <div id="view-login" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
+        <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 fade-in text-center">
+            <div class="w-24 h-24 mx-auto mb-4 relative">
+                <img id="login-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" class="w-full h-full rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg">
+                <div class="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
             </div>
-          </div>
+            <h1 class="text-xl font-bold mb-1" id="login-name">สวัสดี, นักเรียน</h1>
+            <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">กรุณากรอกรหัสผ่านเพื่อเข้าถึงไฟล์</p>
+            
+            <form id="form-login" class="space-y-4">
+                <input type="password" id="login-pass" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-lg tracking-widest" placeholder="••••••••">
+                <button type="submit" class="w-full py-3.5 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
+                    <i data-lucide="unlock" class="w-5 h-5"></i> ปลดล็อก
+                </button>
+            </form>
+            <button onclick="resetDataConfirm()" class="mt-6 text-xs text-gray-400 hover:text-red-500 underline">ลืมรหัสผ่าน? (รีเซ็ตข้อมูลทั้งหมด)</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- VIEW 3: MAIN APP (หน้าหลัก) -->
+    <!-- ========================================== -->
+    <div id="view-app" class="hide w-full h-full flex">
+        
+        <!-- Sidebar -->
+        <aside class="w-72 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-900 z-20 flex-shrink-0 transition-transform duration-300 absolute md:relative -translate-x-full md:translate-x-0 h-full" id="sidebar">
+            <div class="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-600 rounded-xl text-white"><i data-lucide="cloud" class="w-6 h-6"></i></div>
+                    <span class="text-xl font-bold">StudentCloud</span>
+                </div>
+                <button class="md:hidden p-2" onclick="toggleSidebar()"><i data-lucide="x"></i></button>
+            </div>
+
+            <!-- Profile Snippet -->
+            <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+                <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors" onclick="openModal('modal-profile')">
+                    <img id="sidebar-avatar" src="" class="w-10 h-10 rounded-full object-cover">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold truncate" id="sidebar-name">User</p>
+                        <p class="text-[10px] text-gray-500">จัดการโปรไฟล์</p>
+                    </div>
+                    <i data-lucide="settings" class="w-4 h-4 text-gray-400"></i>
+                </div>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto p-4 space-y-1" id="nav-folders">
+                <!-- Nav Items injected via JS -->
+            </nav>
+
+            <div class="p-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                <!-- Storage Info -->
+                <div class="mb-4 px-2">
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="font-semibold text-gray-500">พื้นที่ (Local)</span>
+                        <span id="storage-text" class="font-bold text-indigo-600">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-1.5">
+                        <div id="storage-bar" class="bg-indigo-600 h-1.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p class="text-[9px] text-gray-400 mt-1 text-center">*บันทึกในเบราว์เซอร์ ล้างแคชไฟล์จะหาย</p>
+                </div>
+
+                <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-sm font-medium transition-colors">
+                    <i data-lucide="sun-moon" class="w-5 h-5"></i> เปลี่ยนโหมดสี
+                </button>
+                <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors">
+                    <i data-lucide="log-out" class="w-5 h-5"></i> ล็อกเอาต์
+                </button>
+            </div>
         </aside>
 
-        {/* Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          
-          {/* Header */}
-          <header className="h-20 border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 backdrop-blur-md flex items-center justify-between px-6 lg:px-10">
-            <div className="flex items-center gap-4">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
-                <List size={24} />
-              </button>
-              <h1 className="text-2xl font-bold tracking-tight">
-                {currentView === 'home' ? 'หน้าแรก' : currentView === 'folder' ? currentFolder?.name : currentView}
-              </h1>
-            </div>
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 relative">
+            <!-- Mobile Sidebar Overlay -->
+            <div id="sidebar-overlay" class="hide fixed inset-0 bg-black/50 z-10 md:hidden" onclick="toggleSidebar()"></div>
 
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setActiveModal('createFolder')}
-                className="hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold text-sm transition-all"
-              >
-                <FolderPlus size={18} /> สร้างโฟลเดอร์
-              </button>
-              <button 
-                onClick={() => fileInputRef.current.click()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all"
-              >
-                <Upload size={18} /> อัปโหลด
-              </button>
-              <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleUpload} />
-            </div>
-          </header>
-
-          {/* Grid Content */}
-          <div className="flex-1 overflow-y-auto p-6 lg:p-10 pb-20">
-            
-            {/* Breadcrumb for folders */}
-            {currentFolder && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-gray-900 w-fit px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-800">
-                <span className="hover:text-indigo-600 cursor-pointer" onClick={() => { setCurrentView('home'); setCurrentFolderId(null); }}>หน้าแรก</span>
-                <ChevronRight size={14} />
-                <span className="font-bold text-gray-900 dark:text-white">{currentFolder.name}</span>
-              </div>
-            )}
-
-            {displayFiles.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                <div className="w-20 h-20 bg-gray-200 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
-                  <Cloud size={40} />
+            <!-- Header -->
+            <header class="h-20 glass flex items-center justify-between px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
+                <div class="flex items-center gap-3">
+                    <button class="md:hidden p-2 text-gray-600 dark:text-gray-300" onclick="toggleSidebar()">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <h2 class="text-xl font-bold truncate" id="current-view-title">หน้าแรก</h2>
                 </div>
-                <h3 className="text-xl font-bold">ว่างเปล่า</h3>
-                <p className="text-sm mt-2">ยังไม่มีไฟล์ในหมวดหมู่นี้ อัปโหลดไฟล์แรกของคุณเลย!</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                {displayFiles.map(file => (
-                  <FileCard 
-                    key={file.id} 
-                    file={file} 
-                    onAction={(action) => {
-                      setSelectedItem(file);
-                      if (action === 'preview') setActiveModal('preview');
-                      else if (action === 'rename') { setInputValue(file.name); setActiveModal('rename'); }
-                      else if (action === 'delete') setActiveModal('delete');
-                      else if (action === 'copy') copyFile();
-                    }} 
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="openModal('modal-create-folder')" class="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 font-semibold text-sm transition-all">
+                        <i data-lucide="folder-plus" class="w-4 h-4"></i> สร้างโฟลเดอร์
+                    </button>
+                    <button onclick="document.getElementById('file-upload').click()" class="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all">
+                        <i data-lucide="upload" class="w-4 h-4"></i> อัปโหลด
+                    </button>
+                    <input type="file" id="file-upload" multiple class="hidden" onchange="handleFileUpload(event)">
+                </div>
+            </header>
+
+            <!-- File Grid Area -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24">
+                
+                <!-- Breadcrumb -->
+                <div id="breadcrumb" class="hide flex items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-gray-900 w-fit px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-800">
+                    <span class="hover:text-indigo-600 cursor-pointer flex items-center gap-1" onclick="navigateTo(null)"><i data-lucide="home" class="w-4 h-4"></i> หน้าแรก</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                    <span class="font-bold text-gray-900 dark:text-white flex items-center gap-1" id="breadcrumb-current"><i data-lucide="folder" class="w-4 h-4"></i> <span></span></span>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="hide h-full flex flex-col items-center justify-center text-center opacity-50 mt-20">
+                    <i data-lucide="folder-open" class="w-20 h-20 mb-4"></i>
+                    <h3 class="text-xl font-bold">พื้นที่ว่างเปล่า</h3>
+                    <p class="text-sm mt-2">กดปุ่มอัปโหลดด้านบนเพื่อเพิ่มไฟล์</p>
+                </div>
+
+                <!-- Grid -->
+                <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Cards injected via JS -->
+                </div>
+            </div>
         </main>
-      </div>
+    </div>
 
-      {/* MODALS */}
-      {activeModal === 'createFolder' && (
-        <Modal title="สร้างโฟลเดอร์ใหม่" onClose={() => setActiveModal(null)} onConfirm={createFolder}>
-          <input 
-            autoFocus
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-            placeholder="ชื่อโฟลเดอร์..."
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-          />
-        </Modal>
-      )}
+    <!-- ========================================== -->
+    <!-- MODALS -->
+    <!-- ========================================== -->
 
-      {activeModal === 'rename' && (
-        <Modal title="เปลี่ยนชื่อไฟล์" onClose={() => setActiveModal(null)} onConfirm={renameFile}>
-          <input 
-            autoFocus
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-            placeholder="ชื่อใหม่..."
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-          />
-        </Modal>
-      )}
-
-      {activeModal === 'delete' && (
-        <Modal title="ยืนยันการลบ" onClose={() => setActiveModal(null)} onConfirm={() => deleteItem(selectedItem.id, 'file')} danger>
-          <p className="text-gray-500 dark:text-gray-400">คุณแน่ใจหรือไม่ว่าต้องการลบไฟล์ <span className="font-bold text-gray-900 dark:text-white">"{selectedItem?.name}"</span>? การดำเนินการนี้ไม่สามารถกู้คืนได้</p>
-        </Modal>
-      )}
-
-      {activeModal === 'preview' && selectedItem && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-300">
-          <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-md text-white border-b border-white/10">
-            <div className="flex-1 min-w-0 pr-4">
-              <h2 className="font-bold truncate">{selectedItem.name}</h2>
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest">{selectedItem.category}</p>
+    <!-- Profile Modal -->
+    <div id="modal-profile" class="hide fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">โปรไฟล์บัญชี</h2>
+                <button onclick="closeModal('modal-profile')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"><i data-lucide="x"></i></button>
             </div>
-            <button onClick={() => setActiveModal(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
-              <X size={20} />
-            </button>
-          </div>
-          <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-            {selectedItem.type.startsWith('image/') ? (
-              <img src={selectedItem.data} className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" alt={selectedItem.name} />
-            ) : selectedItem.type.includes('text') || selectedItem.type.includes('javascript') ? (
-              <div className="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-indigo-300 border border-white/10">
-                <pre>{atob(selectedItem.data.split(',')[1])}</pre>
-              </div>
-            ) : (
-              <div className="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10 max-w-sm">
-                <File size={60} className="mx-auto mb-4 opacity-50" />
-                <h3 className="text-xl font-bold">ไม่สามารถดูตัวอย่างได้</h3>
-                <p className="text-sm text-gray-400 mt-2">ไฟล์ประเภทนี้ไม่รองรับการแสดงผลโดยตรง คุณสามารถดาวน์โหลดไปเปิดในแอปอื่นได้</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-// Reusable Components
-function NavItem({ active, icon, label, onClick }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
-        active 
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' 
-          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function FileCard({ file, onAction }) {
-  const [showMenu, setShowMenu] = useState(false);
-  
-  const getIcon = () => {
-    switch(file.category) {
-      case 'รูปภาพ': return <ImageIcon className="text-purple-500" />;
-      case 'โค้ด': return <FileCode className="text-blue-500" />;
-      case 'เอกสาร': return <FileText className="text-emerald-500" />;
-      default: return <File className="text-gray-500" />;
-    }
-  };
-
-  return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex items-center gap-4 hover:shadow-xl hover:shadow-gray-200 dark:hover:shadow-none transition-all group relative">
-      <div 
-        onClick={() => onAction('preview')}
-        className="w-14 h-14 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 cursor-pointer group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/20 transition-colors"
-      >
-        {getIcon()}
-      </div>
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onAction('preview')}>
-        <h3 className="font-bold text-sm truncate pr-6">{file.name}</h3>
-        <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">
-          {(file.size / 1024).toFixed(1)} KB • {new Date(file.createdAt).toLocaleDateString('th-TH')}
-        </p>
-      </div>
-      
-      <div className="absolute top-4 right-4">
-        <button onClick={() => setShowMenu(!showMenu)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 transition-colors">
-          <MoreVertical size={18} />
-        </button>
-        {showMenu && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl z-20 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
-              <MenuBtn icon={<ImageIcon size={16}/>} label="เปิดดู" onClick={() => { onAction('preview'); setShowMenu(false); }} />
-              <MenuBtn icon={<Pencil size={16}/>} label="เปลี่ยนชื่อ" onClick={() => { onAction('rename'); setShowMenu(false); }} />
-              <MenuBtn icon={<Copy size={16}/>} label="คัดลอก" onClick={() => { onAction('copy'); setShowMenu(false); }} />
-              <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
-              <MenuBtn icon={<Trash2 size={16}/>} label="ลบทิ้ง" danger onClick={() => { onAction('delete'); setShowMenu(false); }} />
+            
+            <div class="flex flex-col items-center mb-6">
+                <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-upload').click()">
+                    <img id="profile-modal-avatar" src="" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 dark:border-gray-700 shadow-md">
+                    <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <i data-lucide="camera" class="text-white w-8 h-8"></i>
+                    </div>
+                </div>
+                <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
+                <p class="text-xs text-gray-400 mt-2">แตะเพื่อเปลี่ยนรูป</p>
             </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function MenuBtn({ icon, label, onClick, danger }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-        danger ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
-function Modal({ title, children, onClose, onConfirm, danger }) {
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-200">
-        <h2 className="text-xl font-bold mb-6">{title}</h2>
-        <div className="mb-8">{children}</div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3.5 rounded-2xl bg-gray-100 dark:bg-gray-800 font-bold text-sm hover:bg-gray-200 transition-colors">ยกเลิก</button>
-          <button 
-            onClick={onConfirm} 
-            className={`flex-1 py-3.5 rounded-2xl font-bold text-sm text-white shadow-lg transition-all active:scale-95 ${
-              danger ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'
-            }`}
-          >
-            ยืนยัน
-          </button>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">ชื่อแสดงผล</label>
+                    <input type="text" id="profile-name-input" class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <button onclick="saveProfile()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl mt-4">บันทึกข้อมูล</button>
+            </div>
         </div>
-      </div>
     </div>
-  );
-}
+
+    <!-- Create Folder Modal -->
+    <div id="modal-create-folder" class="hide fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+            <h2 class="text-xl font-bold mb-4">สร้างโฟลเดอร์ใหม่</h2>
+            <input type="text" id="folder-name-input" placeholder="ชื่อโฟลเดอร์..." class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 mb-6">
+            <div class="flex gap-3">
+                <button onclick="closeModal('modal-create-folder')" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
+                <button onclick="createFolder()" class="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold">สร้าง</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="modal-preview" class="hide fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-md fade-in">
+        <div class="flex items-center justify-between p-4 border-b border-white/10 text-white">
+            <div class="flex items-center gap-3 min-w-0">
+                <i id="preview-icon" data-lucide="file" class="w-6 h-6 text-gray-400"></i>
+                <div>
+                    <h2 id="preview-name" class="font-bold truncate max-w-[200px] md:max-w-md">filename.ext</h2>
+                    <p id="preview-meta" class="text-xs text-gray-400">100 KB</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btn-download" class="p-2 hover:bg-white/10 rounded-lg flex items-center gap-2 text-sm"><i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">โหลด</span></button>
+                <button onclick="closeModal('modal-preview')" class="p-2 hover:bg-red-500/20 text-red-400 rounded-lg"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+        </div>
+        <div id="preview-content" class="flex-1 overflow-auto flex items-center justify-center p-4">
+            <!-- Content injected here -->
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ========================================== -->
+    <script>
+        // --- 1. State Management ---
+        const DB_KEY = 'studentCloud_v5';
+        const MAX_STORAGE_MB = 4.5; // Set limit to prevent crashing localStorage
+        
+        let state = {
+            password: null,
+            user: {
+                name: 'นักเรียน',
+                avatar: 'https://ui-avatars.com/api/?name=St&background=6366f1&color=fff'
+            },
+            theme: 'light',
+            folders: [], // { id, name, parentId }
+            files: []    // { id, name, size, type, data(base64), folderId, date }
+        };
+
+        let currentFolderId = null;
+        let isAuthenticated = false;
+
+        // --- 2. Initialize App ---
+        function init() {
+            loadData();
+            applyTheme();
+            
+            if (!state.password) {
+                showView('view-setup');
+            } else if (!isAuthenticated) {
+                // Prepare login screen data
+                document.getElementById('login-name').innerText = `สวัสดี, ${state.user.name}`;
+                document.getElementById('login-avatar').src = state.user.avatar;
+                showView('view-login');
+            } else {
+                showView('view-app');
+                updateUI();
+            }
+            lucide.createIcons();
+        }
+
+        // --- 3. Storage Functions ---
+        function loadData() {
+            const saved = localStorage.getItem(DB_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                } catch(e) { console.error("Data corrupted", e); }
+            }
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem(DB_KEY, JSON.stringify(state));
+                updateStorageIndicator();
+                return true;
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    showToast('พื้นที่เบราว์เซอร์เต็ม! กรุณาลบไฟล์บางส่วน', 'error');
+                } else {
+                    showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+                }
+                return false;
+            }
+        }
+
+        function updateStorageIndicator() {
+            if(!isAuthenticated) return;
+            const dataStr = localStorage.getItem(DB_KEY) || '';
+            const bytes = new Blob([dataStr]).size;
+            const mb = bytes / (1024 * 1024);
+            const percent = Math.min((mb / MAX_STORAGE_MB) * 100, 100);
+            
+            document.getElementById('storage-bar').style.width = `${percent}%`;
+            document.getElementById('storage-text').innerText = `${percent.toFixed(1)}%`;
+            
+            if(percent > 90) document.getElementById('storage-bar').classList.replace('bg-indigo-600', 'bg-red-500');
+            else document.getElementById('storage-bar').classList.replace('bg-red-500', 'bg-indigo-600');
+        }
+
+        // --- 4. Authentication Logic ---
+        document.getElementById('form-setup').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = document.getElementById('setup-pass').value;
+            const conf = document.getElementById('setup-confirm').value;
+            if (pass !== conf) return showToast('รหัสผ่านไม่ตรงกัน!', 'error');
+            
+            state.password = btoa(pass); // Simple encode (not secure encryption, but enough for local barrier)
+            isAuthenticated = true;
+            saveData();
+            showToast('ตั้งค่าสำเร็จ!', 'success');
+            init();
+        });
+
+        document.getElementById('form-login').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const pass = document.getElementById('login-pass').value;
+            if (btoa(pass) === state.password) {
+                isAuthenticated = true;
+                document.getElementById('login-pass').value = '';
+                showToast('เข้าสู่ระบบสำเร็จ');
+                init();
+            } else {
+                showToast('รหัสผ่านไม่ถูกต้อง', 'error');
+                document.getElementById('login-pass').value = '';
+            }
+        });
+
+        function logout() {
+            isAuthenticated = false;
+            init();
+        }
+
+        function resetDataConfirm() {
+            if(confirm('คำเตือน: การรีเซ็ตจะลบ "ไฟล์ทั้งหมด" และรหัสผ่านของคุณ คุณแน่ใจหรือไม่?')) {
+                localStorage.removeItem(DB_KEY);
+                location.reload();
+            }
+        }
+
+        // --- 5. Profile Management ---
+        function handleAvatarChange(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 500 * 1024) return showToast('รูปโปรไฟล์ต้องขนาดไม่เกิน 500KB', 'error');
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                document.getElementById('profile-modal-avatar').src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveProfile() {
+            const newName = document.getElementById('profile-name-input').value.trim();
+            const newAvatar = document.getElementById('profile-modal-avatar').src;
+            
+            if (newName) state.user.name = newName;
+            state.user.avatar = newAvatar;
+            
+            if(saveData()) {
+                showToast('อัปเดตโปรไฟล์แล้ว');
+                closeModal('modal-profile');
+                updateUI();
+            }
+        }
+
+        // --- 6. File & Folder Operations ---
+        function createFolder() {
+            const name = document.getElementById('folder-name-input').value.trim();
+            if (!name) return;
+            
+            const newFolder = {
+                id: 'fd_' + Date.now(),
+                name: name,
+                parentId: currentFolderId
+            };
+            
+            state.folders.push(newFolder);
+            if(saveData()) {
+                document.getElementById('folder-name-input').value = '';
+                closeModal('modal-create-folder');
+                showToast(`สร้างโฟลเดอร์ "${name}" แล้ว`);
+                updateUI();
+            } else {
+                state.folders.pop(); // Revert if save failed
+            }
+        }
+
+        function handleFileUpload(e) {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            Array.from(files).forEach(file => {
+                // Check single file size limit (~1.5MB for local storage safety)
+                if (file.size > 1.5 * 1024 * 1024) {
+                    return showToast(`ไฟล์ ${file.name} ใหญ่เกิน 1.5MB (ข้อจำกัดเบราว์เซอร์)`, 'error');
+                }
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const newFile = {
+                        id: 'fi_' + Date.now() + Math.random().toString(16).slice(2),
+                        name: file.name,
+                        size: file.size,
+                        type: file.type || getExtType(file.name),
+                        data: event.target.result,
+                        folderId: currentFolderId,
+                        date: new Date().getTime()
+                    };
+                    
+                    state.files.push(newFile);
+                    if(saveData()) {
+                        showToast(`อัปโหลด ${file.name} สำเร็จ`);
+                        updateUI();
+                    } else {
+                        state.files.pop(); // Revert
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+            e.target.value = ''; // Reset input
+        }
+
+        function deleteItem(id, isFolder) {
+            if(!confirm('ยืนยันการลบ?')) return;
+
+            if (isFolder) {
+                // Very basic cascade delete (only deletes files directly inside, not subfolders for simplicity in this version)
+                state.files = state.files.filter(f => f.folderId !== id);
+                state.folders = state.folders.filter(f => f.id !== id);
+            } else {
+                state.files = state.files.filter(f => f.id !== id);
+            }
+            
+            saveData();
+            showToast('ลบรายการสำเร็จ');
+            updateUI();
+        }
+
+        // --- 7. Navigation & Rendering ---
+        function navigateTo(folderId) {
+            currentFolderId = folderId;
+            updateUI();
+        }
+
+        function updateUI() {
+            if(!isAuthenticated) return;
+
+            // Profile Info
+            document.getElementById('sidebar-avatar').src = state.user.avatar;
+            document.getElementById('sidebar-name').innerText = state.user.name;
+            document.getElementById('profile-modal-avatar').src = state.user.avatar;
+            document.getElementById('profile-name-input').value = state.user.name;
+
+            updateStorageIndicator();
+
+            // Filter data for current view
+            const currentFolders = state.folders.filter(f => f.parentId === currentFolderId);
+            const currentFiles = state.files.filter(f => f.folderId === currentFolderId);
+            const isEmpty = currentFolders.length === 0 && currentFiles.length === 0;
+
+            // Toggle Empty State
+            document.getElementById('empty-state').classList.toggle('hide', !isEmpty);
+            
+            // Header & Breadcrumb
+            if (currentFolderId === null) {
+                document.getElementById('current-view-title').innerText = 'หน้าแรก';
+                document.getElementById('breadcrumb').classList.add('hide');
+            } else {
+                const folder = state.folders.find(f => f.id === currentFolderId);
+                document.getElementById('current-view-title').innerText = folder ? folder.name : 'โฟลเดอร์';
+                document.getElementById('breadcrumb').classList.remove('hide');
+                document.querySelector('#breadcrumb-current span').innerText = folder ? folder.name : '';
+            }
+
+            // Render Sidebar Navigation
+            const navHtml = [
+                `<button onclick="navigateTo(null)" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${currentFolderId === null ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="home" class="w-5 h-5"></i> หน้าแรก</button>`,
+                `<div class="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4">โฟลเดอร์ของคุณ</div>`
+            ];
+            state.folders.filter(f => f.parentId === null).forEach(f => {
+                const isActive = currentFolderId === f.id;
+                navHtml.push(`<button onclick="navigateTo('${f.id}')" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="folder" class="w-4 h-4"></i> <span class="truncate">${f.name}</span></button>`);
+            });
+            document.getElementById('nav-folders').innerHTML = navHtml.join('');
+
+            // Render Grid Cards
+            let gridHtml = '';
+            
+            // Render Folders first
+            currentFolders.forEach(f => {
+                gridHtml += `
+                <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group cursor-pointer" onclick="navigateTo('${f.id}')">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 rounded-xl flex items-center justify-center">
+                            <i data-lucide="folder" class="w-6 h-6"></i>
+                        </div>
+                        <button onclick="event.stopPropagation(); deleteItem('${f.id}', true)" class="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                    <h3 class="font-bold text-sm truncate">${f.name}</h3>
+                    <p class="text-[10px] text-gray-400 mt-1 uppercase">โฟลเดอร์</p>
+                </div>`;
+            });
+
+            // Render Files
+            currentFiles.forEach(f => {
+                const icon = f.type.includes('image') ? 'image' : f.type.includes('text') || f.type.includes('json') ? 'file-code' : 'file-text';
+                const colorClass = f.type.includes('image') ? 'text-purple-500 bg-purple-50 dark:bg-purple-900/30' : 'text-blue-500 bg-blue-50 dark:bg-blue-900/30';
+                
+                gridHtml += `
+                <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 ${colorClass} rounded-xl flex items-center justify-center cursor-pointer" onclick="openPreview('${f.id}')">
+                            <i data-lucide="${icon}" class="w-6 h-6"></i>
+                        </div>
+                        <button onclick="deleteItem('${f.id}', false)" class="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                    <div class="cursor-pointer" onclick="openPreview('${f.id}')">
+                        <h3 class="font-bold text-sm truncate" title="${f.name}">${f.name}</h3>
+                        <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold">${formatBytes(f.size)} • ${new Date(f.date).toLocaleDateString('th-TH')}</p>
+                    </div>
+                </div>`;
+            });
+
+            document.getElementById('file-grid').innerHTML = gridHtml;
+            lucide.createIcons();
+        }
+
+        // --- 8. Preview & Utility Functions ---
+        function openPreview(fileId) {
+            const file = state.files.find(f => f.id === fileId);
+            if(!file) return;
+
+            document.getElementById('preview-name').innerText = file.name;
+            document.getElementById('preview-meta').innerText = `${formatBytes(file.size)} • ${file.type}`;
+            
+            const contentArea = document.getElementById('preview-content');
+            contentArea.innerHTML = ''; // Clear old
+            
+            document.getElementById('btn-download').onclick = () => {
+                const a = document.createElement('a');
+                a.href = file.data;
+                a.download = file.name;
+                a.click();
+            };
+
+            if (file.type.includes('image')) {
+                contentArea.innerHTML = `<img src="${file.data}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">`;
+            } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('javascript') || file.type.includes('html')) {
+                try {
+                    // Extract base64 text
+                    const base64Str = file.data.split(',')[1];
+                    const decodedText = decodeURIComponent(escape(window.atob(base64Str)));
+                    contentArea.innerHTML = `<div class="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-green-400 border border-white/10 text-left"><pre>${decodedText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></div>`;
+                } catch(e) {
+                    contentArea.innerHTML = `<div class="text-white text-center"><i data-lucide="alert-triangle" class="w-12 h-12 mx-auto mb-2 text-yellow-500"></i><p>ไม่สามารถอ่านข้อความได้</p></div>`;
+                }
+            } else {
+                contentArea.innerHTML = `
+                    <div class="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10">
+                        <i data-lucide="file-question" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
+                        <h3 class="text-xl font-bold mb-2">ไม่มีตัวอย่างแสดงผล</h3>
+                        <p class="text-sm text-gray-400">กดปุ่มดาวน์โหลดด้านบนเพื่อเปิดไฟล์ในเครื่องของคุณ</p>
+                    </div>`;
+            }
+
+            openModal('modal-preview');
+            lucide.createIcons();
+        }
+
+        function getExtType(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if(['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image/'+ext;
+            if(['txt','html','css','js','json','py'].includes(ext)) return 'text/plain';
+            return 'application/octet-stream';
+        }
+
+        function formatBytes(bytes) {
+            if(bytes === 0) return '0 B';
+            const k = 1024, sizes = ['B', 'KB', 'MB'], i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // --- UI Helpers ---
+        function showView(viewId) {
+            ['view-setup', 'view-login', 'view-app'].forEach(v => document.getElementById(v).classList.add('hide'));
+            document.getElementById(viewId).classList.remove('hide');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hide'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hide'); }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('-translate-x-full');
+            overlay.classList.toggle('hide');
+        }
+
+        function toggleTheme() {
+            state.theme = state.theme === 'light' ? 'dark' : 'light';
+            applyTheme();
+            saveData();
+        }
+
+        function applyTheme() {
+            if (state.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'error' ? 'bg-red-500' : 'bg-gray-900 dark:bg-white';
+            const textColor = type === 'error' ? 'text-white' : 'text-white dark:text-gray-900';
+            
+            toast.className = `flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all fade-in font-medium text-sm ${bgColor} ${textColor}`;
+            toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle-2'}" class="w-5 h-5 ${type === 'success' ? 'text-green-400' : ''}"></i> ${msg}`;
+            
+            document.getElementById('toast-container').appendChild(toast);
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Run App
+        window.onload = init;
+
+    </script>
+</body>
+</html>
+
 
