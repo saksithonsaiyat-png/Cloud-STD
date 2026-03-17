@@ -342,15 +342,22 @@
     });
 
     async function init() {
-      try { await initDB(); await loadData(); } catch { showToast("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "error"); }
+      try { 
+        await initDB(); 
+        await loadData(); 
+      } catch { 
+        showToast("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "error"); 
+      }
+      
       applyTheme();
       applyWorkspaceTheme();
       renderThemeOptions();
       requestPersistentStorage();
       setupDropZone();
 
-      if (!state.password) showView("view-setup");
-      else if (!isAuthenticated) {
+      if (!state.password) {
+        showView("view-setup");
+      } else if (!isAuthenticated) {
         document.getElementById("login-name").innerText = `สวัสดี, ${state.user.name}`;
         document.getElementById("login-avatar").src = state.user.avatar;
         showView("view-login");
@@ -363,12 +370,25 @@
 
     async function loadData() {
       const saved = await idbGet("appState");
-      if (saved) state = { ...state, ...saved, ui: { cardTheme: "indigo", workspaceTheme: "aurora", decorationEmoji: "✨", ...(saved.ui || {}) } };
+      if (saved) {
+        state = { 
+          ...state, 
+          ...saved, 
+          ui: { cardTheme: "indigo", workspaceTheme: "aurora", decorationEmoji: "✨", ...(saved.ui || {}) } 
+        };
+      }
     }
 
     async function saveData() {
-      try { await idbSet("appState", state); await updateStorageIndicator(); return true; }
-      catch { showToast("พื้นที่เบราว์เซอร์อาจจะเต็ม", "error"); return false; }
+      try { 
+        await idbSet("appState", state); 
+        await updateStorageIndicator(); 
+        return true; 
+      }
+      catch { 
+        showToast("พื้นที่เบราว์เซอร์อาจจะเต็ม", "error"); 
+        return false; 
+      }
     }
 
     async function requestPersistentStorage() {
@@ -387,54 +407,64 @@
       } catch {}
     }
 
-    document.getElementById("form-setup").addEventListener("submit", async e => {
-  e.preventDefault();
-  
-  // ดึงค่าโดยระบุ ID ให้ชัดเจน
-  const pass = document.getElementById("setup-pass").value;
-  const conf = document.getElementById("setup-confirm").value;
-  
-  if (pass !== conf) {
-    showToast("รหัสผ่านไม่ตรงกัน!", "error");
-    return;
-  }
-  
-  if (pass.length < 4) {
-    showToast("รหัสผ่านต้องมีอย่างน้อย 4 ตัว", "error");
-    return;
-  }
-
-  state.password = btoa(pass);
-  isAuthenticated = true;
-  
-  const saved = await saveData(); // รอให้เซฟลง IndexedDB เสร็จก่อน
-  if (saved) {
-    showToast("สร้างรหัสผ่านสำเร็จ");
-    // เปลี่ยนหน้าไปที่หน้าแอปโดยตรง ไม่ต้องรอ init ซ้ำ
-    showView("view-app");
-    updateUI();
-  }
-});
-
-
-    document.getElementById("form-login").addEventListener("submit", e => {
+    // แก้ไขฟังก์ชันการสร้างบัญชี
+    document.getElementById("form-setup").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const pass = loginPass.value;
-      if (btoa(pass) === state.password) {
-        isAuthenticated = true;
-        loginPass.value = "";
-        showToast("เข้าสู่ระบบสำเร็จ");
-        init();
+      
+      const passInput = document.getElementById("setup-pass");
+      const confirmInput = document.getElementById("setup-confirm");
+      
+      const pass = passInput.value;
+      const conf = confirmInput.value;
+      
+      if (!pass || pass.length < 4) {
+        showToast("รหัสผ่านต้องมีอย่างน้อย 4 ตัว", "error");
+        return;
+      }
+      
+      if (pass !== conf) {
+        showToast("รหัสผ่านไม่ตรงกัน!", "error");
+        return;
+      }
+
+      // บันทึกรหัสผ่าน (Base64 แบบง่าย)
+      state.password = btoa(unescape(encodeURIComponent(pass)));
+      isAuthenticated = true;
+      
+      const isSaved = await saveData();
+      if (isSaved) {
+        showToast("สร้างพื้นที่ส่วนตัวสำเร็จ ✨");
+        showView("view-app");
+        updateUI();
       } else {
-        showToast("รหัสผ่านไม่ถูกต้อง", "error");
-        loginPass.value = "";
+        showToast("เกิดข้อผิดพลาดในการบันทึกข้อมูล", "error");
       }
     });
 
-    function logout() { isAuthenticated = false; init(); }
+    document.getElementById("form-login").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const loginPassInput = document.getElementById("login-pass");
+      const pass = loginPassInput.value;
+      
+      if (btoa(unescape(encodeURIComponent(pass))) === state.password) {
+        isAuthenticated = true;
+        loginPassInput.value = "";
+        showToast("ยินดีต้อนรับกลับมา");
+        showView("view-app");
+        updateUI();
+      } else {
+        showToast("รหัสผ่านไม่ถูกต้อง", "error");
+        loginPassInput.value = "";
+      }
+    });
+
+    function logout() { 
+      isAuthenticated = false; 
+      init(); 
+    }
 
     function resetDataConfirm() {
-      if (confirm('ลบข้อมูลทั้งหมดถาวรใช่ไหม?')) {
+      if (confirm('คำเตือน: ข้อมูลและไฟล์ทั้งหมดจะถูกลบถาวร คุณแน่ใจใช่ไหม?')) {
         const req = indexedDB.deleteDatabase(DB_NAME);
         req.onsuccess = () => location.reload();
         req.onerror = () => { localStorage.clear(); location.reload(); };
@@ -446,24 +476,31 @@
       if (!f) return;
       if (f.size > 2 * 1024 * 1024) return showToast("รูปโปรไฟล์ไม่เกิน 2MB", "error");
       const r = new FileReader();
-      r.onload = ev => profileModalAvatar.src = ev.target.result;
+      r.onload = ev => {
+        document.getElementById("profile-modal-avatar").src = ev.target.result;
+      };
       r.readAsDataURL(f);
     }
 
     async function saveProfile() {
-      const n = profileNameInput.value.trim();
+      const n = document.getElementById("profile-name-input").value.trim();
       if (n) state.user.name = n;
-      state.user.avatar = profileModalAvatar.src;
-      if (await saveData()) { closeModal("modal-profile"); updateUI(); showToast("บันทึกโปรไฟล์แล้ว"); }
+      state.user.avatar = document.getElementById("profile-modal-avatar").src;
+      if (await saveData()) { 
+        closeModal("modal-profile"); 
+        updateUI(); 
+        showToast("บันทึกโปรไฟล์แล้ว"); 
+      }
     }
 
     async function createFolder() {
-      const name = folderNameInput.value.trim();
+      const input = document.getElementById("folder-name-input");
+      const name = input.value.trim();
       if (!name) return;
       const fd = { id: "fd_" + Date.now(), name, parentId: currentFolderId, color: state.ui.cardTheme };
       state.folders.push(fd);
       if (await saveData()) {
-        folderNameInput.value = "";
+        input.value = "";
         closeModal("modal-create-folder");
         showToast(`สร้างโฟลเดอร์ "${name}" แล้ว`);
         updateUI();
@@ -473,7 +510,8 @@
     async function handleFileUpload(e) {
       const files = e.target.files;
       if (!files?.length) return;
-      uploadLoading.classList.remove("hide");
+      const loader = document.getElementById("upload-loading");
+      loader.classList.remove("hide");
 
       for (const file of files) {
         if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
@@ -499,7 +537,7 @@
         }
       }
 
-      uploadLoading.classList.add("hide");
+      loader.classList.add("hide");
       updateUI();
       e.target.value = "";
     }
@@ -547,23 +585,25 @@
     function updateUI() {
       if (!isAuthenticated) return;
 
-      sidebarAvatar.src = state.user.avatar;
-      sidebarName.innerText = state.user.name;
-      profileModalAvatar.src = state.user.avatar;
-      profileNameInput.value = state.user.name;
+      document.getElementById("sidebar-avatar").src = state.user.avatar;
+      document.getElementById("sidebar-name").innerText = state.user.name;
+      document.getElementById("profile-modal-avatar").src = state.user.avatar;
+      document.getElementById("profile-name-input").value = state.user.name;
       updateStorageIndicator();
 
       const currentFolders = state.folders.filter(f => f.parentId === currentFolderId);
       const currentFiles = state.files.filter(f => f.folderId === currentFolderId);
-      emptyState.classList.toggle("hide", !(currentFolders.length === 0 && currentFiles.length === 0));
+      document.getElementById("empty-state").classList.toggle("hide", !(currentFolders.length === 0 && currentFiles.length === 0));
 
+      const titleEl = document.getElementById("current-view-title");
+      const breadcrumbEl = document.getElementById("breadcrumb");
       if (currentFolderId === null) {
-        currentViewTitle.innerText = "หน้าแรก";
-        breadcrumb.classList.add("hide");
+        titleEl.innerText = "หน้าแรก";
+        breadcrumbEl.classList.add("hide");
       } else {
         const folder = state.folders.find(f => f.id === currentFolderId);
-        currentViewTitle.innerText = folder ? folder.name : "โฟลเดอร์";
-        breadcrumb.classList.remove("hide");
+        titleEl.innerText = folder ? folder.name : "โฟลเดอร์";
+        breadcrumbEl.classList.remove("hide");
         document.querySelector("#breadcrumb-current span").innerText = folder ? folder.name : "";
       }
 
@@ -574,7 +614,7 @@
       state.folders.filter(f => f.parentId === null).forEach(f => {
         nav.push(`<button onclick="navigateTo('${f.id}')" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm ${currentFolderId === f.id ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="folder" class="w-4 h-4"></i><span class="truncate">${f.name}</span></button>`);
       });
-      navFolders.innerHTML = nav.join("");
+      document.getElementById("nav-folders").innerHTML = nav.join("");
 
       let grid = "";
       currentFolders.forEach(f => {
@@ -606,7 +646,7 @@
         </div>`;
       });
 
-      fileGrid.innerHTML = grid;
+      document.getElementById("file-grid").innerHTML = grid;
       lucide.createIcons();
     }
 
@@ -615,12 +655,13 @@
       const item = isFolder ? state.folders.find(f => f.id === id) : state.files.find(f => f.id === id);
       if (!item) return;
 
-      itemActionTitle.innerText = `จัดการ: ${item.name}`;
-      itemRenameInput.value = item.name;
+      document.getElementById("item-action-title").innerText = `จัดการ: ${item.name}`;
+      document.getElementById("item-rename-input").value = item.name;
       const options = ['<option value="">หน้าแรก</option>'];
       state.folders.filter(f => !isFolder || f.id !== id).forEach(f => options.push(`<option value="${f.id}">${f.name}</option>`));
-      itemMoveSelect.innerHTML = options.join("");
-      itemMoveSelect.value = item.parentId || item.folderId || "";
+      const moveSelect = document.getElementById("item-move-select");
+      moveSelect.innerHTML = options.join("");
+      moveSelect.value = item.parentId || item.folderId || "";
 
       const appShareBtn = document.getElementById("btn-app-share");
       if (appShareBtn) {
@@ -634,8 +675,8 @@
 
     async function saveItemAction() {
       if (!currentItem) return;
-      const newName = itemRenameInput.value.trim();
-      const moveTo = itemMoveSelect.value || null;
+      const newName = document.getElementById("item-rename-input").value.trim();
+      const moveTo = document.getElementById("item-move-select").value || null;
 
       if (currentItem.isFolder) {
         const folder = state.folders.find(f => f.id === currentItem.id);
@@ -703,9 +744,17 @@
       const shareCode = await encodeSharePayload(payload);
       const text = `SC Share\n${shareCode}`;
 
-      if (navigator.share) { try { await navigator.share({ title: "แชร์จาก StudentCloud", text }); } catch {} }
-      await navigator.clipboard.writeText(text);
-      showToast("คัดลอกโค้ดแชร์แบบสั้นแล้ว");
+      try {
+        if (navigator.share) { 
+          await navigator.share({ title: "แชร์จาก StudentCloud", text }); 
+        } else {
+          await navigator.clipboard.writeText(text);
+          showToast("คัดลอกโค้ดแชร์แล้ว");
+        }
+      } catch {
+        await navigator.clipboard.writeText(text);
+        showToast("คัดลอกโค้ดแชร์แล้ว");
+      }
     }
 
     async function shareToAppsCurrentItem() {
@@ -740,7 +789,8 @@
     }
 
     async function importSharedCode() {
-      const raw = shareCodeInput.value.trim();
+      const input = document.getElementById("share-code-input");
+      const raw = input.value.trim();
       if (!raw) return showToast("กรุณาวางโค้ดแชร์ก่อน", "error");
       const code = (raw.startsWith("StudentCloud Share") || raw.startsWith("SC Share")) ? raw.split("\n").slice(1).join("").trim() : raw;
 
@@ -793,7 +843,7 @@
 
         await saveData();
         closeModal("modal-share-import");
-        shareCodeInput.value = "";
+        input.value = "";
         updateUI();
         showToast("นำเข้าข้อมูลที่แชร์เรียบร้อยแล้ว");
       } catch {
@@ -862,11 +912,16 @@
       const file = state.files.find(f => f.id === fileId);
       if (!file) return;
 
-      previewName.innerText = file.name;
-      previewMeta.innerText = `${formatBytes(file.size)} • ${file.type}`;
-      previewContent.innerHTML = "";
+      const pName = document.getElementById("preview-name");
+      const pMeta = document.getElementById("preview-meta");
+      const pContent = document.getElementById("preview-content");
+      const bDownload = document.getElementById("btn-download");
 
-      btnDownload.onclick = () => {
+      pName.innerText = file.name;
+      pMeta.innerText = `${formatBytes(file.size)} • ${file.type}`;
+      pContent.innerHTML = "";
+
+      bDownload.onclick = () => {
         const a = document.createElement("a");
         a.href = file.data;
         a.download = file.name;
@@ -874,19 +929,19 @@
       };
 
       if (file.type.includes("image")) {
-        previewContent.innerHTML = `<img src="${file.data}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">`;
+        pContent.innerHTML = `<img src="${file.data}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">`;
       } else if (file.type.includes("video")) {
-        previewContent.innerHTML = `<video controls class="max-w-full max-h-full rounded-lg shadow-2xl"><source src="${file.data}" type="${file.type}"></video>`;
+        pContent.innerHTML = `<video controls class="max-w-full max-h-full rounded-lg shadow-2xl"><source src="${file.data}" type="${file.type}"></video>`;
       } else if (file.type.includes("text") || file.type.includes("json") || file.type.includes("javascript") || file.type.includes("html")) {
         try {
           const b64 = file.data.split(",")[1];
           const txt = decodeURIComponent(escape(window.atob(b64)));
-          previewContent.innerHTML = `<div class="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-green-400 border border-white/10 text-left"><pre>${txt.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>`;
+          pContent.innerHTML = `<div class="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-green-400 border border-white/10 text-left"><pre>${txt.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>`;
         } catch {
-          previewContent.innerHTML = `<div class="text-white text-center"><i data-lucide="alert-triangle" class="w-12 h-12 mx-auto mb-2 text-yellow-500"></i><p>ไม่สามารถอ่านข้อความได้</p></div>`;
+          pContent.innerHTML = `<div class="text-white text-center"><i data-lucide="alert-triangle" class="w-12 h-12 mx-auto mb-2 text-yellow-500"></i><p>ไม่สามารถอ่านข้อความได้</p></div>`;
         }
       } else {
-        previewContent.innerHTML = `<div class="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10"><i data-lucide="file-question" class="w-16 h-16 mx-auto mb-4 opacity-50"></i><h3 class="text-xl font-bold mb-2">ไม่มีตัวอย่างแสดงผล</h3></div>`;
+        pContent.innerHTML = `<div class="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10"><i data-lucide="file-question" class="w-16 h-16 mx-auto mb-4 opacity-50"></i><h3 class="text-xl font-bold mb-2">ไม่มีตัวอย่างแสดงผล</h3></div>`;
       }
 
       openModal("modal-preview");
@@ -908,16 +963,22 @@
     }
 
     function showView(viewId) {
-      ["view-setup","view-login","view-app"].forEach(v => document.getElementById(v).classList.add("hide"));
-      document.getElementById(viewId).classList.remove("hide");
+      ["view-setup","view-login","view-app"].forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add("hide");
+      });
+      const target = document.getElementById(viewId);
+      if (target) target.classList.remove("hide");
     }
 
     function openModal(id) { document.getElementById(id).classList.remove("hide"); }
     function closeModal(id) { document.getElementById(id).classList.add("hide"); }
 
     function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      const overlay = document.getElementById("sidebar-overlay");
       sidebar.classList.toggle("-translate-x-full");
-      sidebarOverlay.classList.toggle("hide");
+      overlay.classList.toggle("hide");
     }
 
     async function toggleTheme() {
@@ -932,17 +993,24 @@
     }
 
     function showToast(msg, type = "success") {
+      const container = document.getElementById("toast-container");
+      if (!container) return;
       const t = document.createElement("div");
       const bg = type === "error" ? "bg-red-500" : "bg-gray-900 dark:bg-white";
       const tc = type === "error" ? "text-white" : "text-white dark:text-gray-900";
       t.className = `flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all fade-in font-medium text-sm ${bg} ${tc}`;
       t.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle-2'}" class="w-5 h-5"></i> ${msg}`;
-      toastContainer.appendChild(t);
+      container.appendChild(t);
       lucide.createIcons();
-      setTimeout(() => { t.style.opacity = "0"; t.style.transform = "translateY(-10px)"; setTimeout(() => t.remove(), 300); }, 2600);
+      setTimeout(() => { 
+        t.style.opacity = "0"; 
+        t.style.transform = "translateY(-10px)"; 
+        setTimeout(() => t.remove(), 300); 
+      }, 2600);
     }
 
-    window.onload = init;
+    window.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
+
