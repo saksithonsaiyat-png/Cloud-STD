@@ -1,728 +1,992 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudentCloud - High Capacity Local Storage</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
-                    colors: { primary: '#4f46e5' }
-                }
-            }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudentCloud - High Capacity Local Storage</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: { sans: ["Prompt", "sans-serif"] },
+          colors: { primary: "#4f46e5" }
         }
-    </script>
-    <style>
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .dark ::-webkit-scrollbar-thumb { background: #475569; }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
-        .dark .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(10px); }
-        .hide { display: none !important; }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
+      }
+    };
+  </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .dark ::-webkit-scrollbar-thumb { background: #475569; }
+
+    .glass { background: rgba(255,255,255,.7); backdrop-filter: blur(10px); }
+    .dark .glass { background: rgba(17,24,39,.7); backdrop-filter: blur(10px); }
+
+    .hide { display: none !important; }
+    .fade-in { animation: fadeIn .3s ease-in-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
+
 <body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300 antialiased overflow-hidden h-screen flex">
 
-    <!-- TOAST NOTIFICATION -->
-    <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+  <!-- Toast -->
+  <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- ========================================== -->
-    <!-- VIEW 1: SETUP -->
-    <!-- ========================================== -->
-    <div id="view-setup" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
-        <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 fade-in text-center">
-            <div class="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
-                <i data-lucide="hard-drive" class="w-10 h-10"></i>
-            </div>
-            <h1 class="text-2xl font-bold mb-2">ยินดีต้อนรับสู่ StudentCloud</h1>
-            <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">เวอร์ชันจัดเก็บความจุสูง (IndexedDB) กรุณาตั้งรหัสผ่านเพื่อล็อกไฟล์ของคุณ</p>
-            
-            <form id="form-setup" class="space-y-4 text-left">
-                <div>
-                    <label class="block text-sm font-semibold mb-1 ml-1">ตั้งรหัสผ่าน</label>
-                    <input type="password" id="setup-pass" required minlength="4" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="รหัสผ่านอย่างน้อย 4 ตัว">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1 ml-1">ยืนยันรหัสผ่าน</label>
-                    <input type="password" id="setup-confirm" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="กรอกรหัสผ่านอีกครั้ง">
-                </div>
-                <button type="submit" class="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-transform active:scale-95">
-                    สร้างพื้นที่ส่วนตัว
-                </button>
-            </form>
+  <!-- Setup -->
+  <div id="view-setup" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
+    <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 fade-in text-center">
+      <div class="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
+        <i data-lucide="hard-drive" class="w-10 h-10"></i>
+      </div>
+      <h1 class="text-2xl font-bold mb-2">ยินดีต้อนรับสู่ StudentCloud</h1>
+      <p class="text-gray-500 dark:text-gray-400 text-sm mb-8">เวอร์ชันจัดเก็บความจุสูง (IndexedDB) กรุณาตั้งรหัสผ่านเพื่อล็อกไฟล์ของคุณ</p>
+
+      <form id="form-setup" class="space-y-4 text-left">
+        <div>
+          <label class="block text-sm font-semibold mb-1 ml-1">ตั้งรหัสผ่าน</label>
+          <input type="password" id="setup-pass" required minlength="4"
+            class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+            placeholder="รหัสผ่านอย่างน้อย 4 ตัว" />
         </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- VIEW 2: LOGIN -->
-    <!-- ========================================== -->
-    <div id="view-login" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
-        <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 fade-in text-center">
-            <div class="w-24 h-24 mx-auto mb-4 relative">
-                <img id="login-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" class="w-full h-full rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg">
-                <div class="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
-            </div>
-            <h1 class="text-xl font-bold mb-1" id="login-name">สวัสดี, นักเรียน</h1>
-            <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">กรุณากรอกรหัสผ่านเพื่อเข้าถึงไฟล์</p>
-            
-            <form id="form-login" class="space-y-4">
-                <input type="password" id="login-pass" required class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-lg tracking-widest" placeholder="••••••••">
-                <button type="submit" class="w-full py-3.5 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
-                    <i data-lucide="unlock" class="w-5 h-5"></i> ปลดล็อก
-                </button>
-            </form>
-            <button onclick="resetDataConfirm()" class="mt-6 text-xs text-gray-400 hover:text-red-500 underline">ลืมรหัสผ่าน? (รีเซ็ตข้อมูลทั้งหมด)</button>
+        <div>
+          <label class="block text-sm font-semibold mb-1 ml-1">ยืนยันรหัสผ่าน</label>
+          <input type="password" id="setup-confirm" required
+            class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+            placeholder="กรอกรหัสผ่านอีกครั้ง" />
         </div>
+        <button type="submit"
+          class="w-full py-3.5 mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none transition-transform active:scale-95">
+          สร้างพื้นที่ส่วนตัว
+        </button>
+      </form>
     </div>
+  </div>
 
-    <!-- ========================================== -->
-    <!-- VIEW 3: MAIN APP -->
-    <!-- ========================================== -->
-    <div id="view-app" class="hide w-full h-full flex">
-        
-        <!-- Sidebar -->
-        <aside class="w-72 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-900 z-20 flex-shrink-0 transition-transform duration-300 absolute md:relative -translate-x-full md:translate-x-0 h-full" id="sidebar">
-            <div class="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-indigo-600 rounded-xl text-white"><i data-lucide="cloud" class="w-6 h-6"></i></div>
-                    <span class="text-xl font-bold">StudentCloud</span>
-                </div>
-                <button class="md:hidden p-2" onclick="toggleSidebar()"><i data-lucide="x"></i></button>
-            </div>
+  <!-- Login -->
+  <div id="view-login" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
+    <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 fade-in text-center">
+      <div class="w-24 h-24 mx-auto mb-4 relative">
+        <img id="login-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff"
+          class="w-full h-full rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg" />
+        <div class="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+      </div>
 
-            <!-- Profile Snippet -->
-            <div class="p-4 border-b border-gray-100 dark:border-gray-800">
-                <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors" onclick="openModal('modal-profile')">
-                    <img id="sidebar-avatar" src="" class="w-10 h-10 rounded-full object-cover">
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold truncate" id="sidebar-name">User</p>
-                        <p class="text-[10px] text-gray-500">จัดการโปรไฟล์</p>
-                    </div>
-                    <i data-lucide="settings" class="w-4 h-4 text-gray-400"></i>
-                </div>
-            </div>
+      <h1 class="text-xl font-bold mb-1" id="login-name">สวัสดี, นักเรียน</h1>
+      <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">กรุณากรอกรหัสผ่านเพื่อเข้าถึงไฟล์</p>
 
-            <nav class="flex-1 overflow-y-auto p-4 space-y-1" id="nav-folders">
-                <!-- Nav Items injected via JS -->
-            </nav>
+      <form id="form-login" class="space-y-4">
+        <input type="password" id="login-pass" required
+          class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-indigo-500 outline-none text-center text-lg tracking-widest"
+          placeholder="••••••••" />
+        <button type="submit"
+          class="w-full py-3.5 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
+          <i data-lucide="unlock" class="w-5 h-5"></i> ปลดล็อก
+        </button>
+      </form>
 
-            <div class="p-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
-                <!-- Storage Info -->
-                <div class="mb-4 px-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <div class="flex items-center gap-2 mb-1">
-                        <i data-lucide="database" class="w-4 h-4 text-indigo-500"></i>
-                        <span class="text-xs font-bold text-gray-600 dark:text-gray-300">พื้นที่เก็บข้อมูล (IndexedDB)</span>
-                    </div>
-                    <div class="flex items-baseline gap-1">
-                        <span id="storage-text" class="text-lg font-bold text-indigo-600 dark:text-indigo-400">0 MB</span>
-                        <span class="text-[10px] text-gray-400">ใช้งานไปแล้ว</span>
-                    </div>
-                </div>
-
-                <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-sm font-medium transition-colors">
-                    <i data-lucide="sun-moon" class="w-5 h-5"></i> เปลี่ยนโหมดสี
-                </button>
-                <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors">
-                    <i data-lucide="log-out" class="w-5 h-5"></i> ล็อกเอาต์
-                </button>
-            </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 relative">
-            <div id="sidebar-overlay" class="hide fixed inset-0 bg-black/50 z-10 md:hidden" onclick="toggleSidebar()"></div>
-
-            <!-- Header -->
-            <header class="h-20 glass flex items-center justify-between px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
-                <div class="flex items-center gap-3">
-                    <button class="md:hidden p-2 text-gray-600 dark:text-gray-300" onclick="toggleSidebar()">
-                        <i data-lucide="menu"></i>
-                    </button>
-                    <h2 class="text-xl font-bold truncate" id="current-view-title">หน้าแรก</h2>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="openModal('modal-create-folder')" class="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 font-semibold text-sm transition-all">
-                        <i data-lucide="folder-plus" class="w-4 h-4"></i> สร้างโฟลเดอร์
-                    </button>
-                    <button onclick="document.getElementById('file-upload').click()" class="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all">
-                        <i data-lucide="upload" class="w-4 h-4"></i> อัปโหลด
-                    </button>
-                    <!-- Max limit removed from input, checked in JS -->
-                    <input type="file" id="file-upload" multiple class="hidden" onchange="handleFileUpload(event)">
-                </div>
-            </header>
-
-            <!-- File Grid Area -->
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 relative" id="drop-zone">
-                
-                <!-- Loading Overlay during heavy upload -->
-                <div id="upload-loading" class="hide absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
-                    <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <p class="font-bold text-lg text-indigo-600 dark:text-indigo-400">กำลังจัดเก็บไฟล์เข้าระบบ...</p>
-                </div>
-
-                <div id="breadcrumb" class="hide flex items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-gray-900 w-fit px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-800">
-                    <span class="hover:text-indigo-600 cursor-pointer flex items-center gap-1" onclick="navigateTo(null)"><i data-lucide="home" class="w-4 h-4"></i> หน้าแรก</span>
-                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                    <span class="font-bold text-gray-900 dark:text-white flex items-center gap-1" id="breadcrumb-current"><i data-lucide="folder" class="w-4 h-4"></i> <span></span></span>
-                </div>
-
-                <div id="empty-state" class="hide h-full flex flex-col items-center justify-center text-center opacity-50 mt-20 pointer-events-none">
-                    <i data-lucide="hard-drive-upload" class="w-20 h-20 mb-4 text-indigo-500"></i>
-                    <h3 class="text-xl font-bold">พื้นที่ว่างเปล่า</h3>
-                    <p class="text-sm mt-2">กดปุ่มอัปโหลดด้านบนเพื่อเพิ่มไฟล์ (สูงสุด 50MB/ไฟล์)</p>
-                </div>
-
-                <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <!-- Cards injected via JS -->
-                </div>
-            </div>
-        </main>
+      <button onclick="resetDataConfirm()" class="mt-6 text-xs text-gray-400 hover:text-red-500 underline">
+        ลืมรหัสผ่าน? (รีเซ็ตข้อมูลทั้งหมด)
+      </button>
     </div>
+  </div>
 
-    <!-- ========================================== -->
-    <!-- MODALS -->
-    <!-- ========================================== -->
-
-    <!-- Profile Modal -->
-    <div id="modal-profile" class="hide fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">โปรไฟล์บัญชี</h2>
-                <button onclick="closeModal('modal-profile')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"><i data-lucide="x"></i></button>
-            </div>
-            
-            <div class="flex flex-col items-center mb-6">
-                <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-upload').click()">
-                    <img id="profile-modal-avatar" src="" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 dark:border-gray-700 shadow-md bg-white">
-                    <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <i data-lucide="camera" class="text-white w-8 h-8"></i>
-                    </div>
-                </div>
-                <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="handleAvatarChange(event)">
-                <p class="text-xs text-gray-400 mt-2">แตะเพื่อเปลี่ยนรูป</p>
-            </div>
-
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">ชื่อแสดงผล</label>
-                    <input type="text" id="profile-name-input" class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <button onclick="saveProfile()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl mt-4">บันทึกข้อมูล</button>
-            </div>
+  <!-- App -->
+  <div id="view-app" class="hide w-full h-full flex">
+    <!-- Sidebar -->
+    <aside id="sidebar"
+      class="w-72 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-900 z-20 flex-shrink-0 transition-transform duration-300 absolute md:relative -translate-x-full md:translate-x-0 h-full">
+      <div class="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-indigo-600 rounded-xl text-white"><i data-lucide="cloud" class="w-6 h-6"></i></div>
+          <span class="text-xl font-bold">StudentCloud</span>
         </div>
-    </div>
+        <button class="md:hidden p-2" onclick="toggleSidebar()"><i data-lucide="x"></i></button>
+      </div>
 
-    <!-- Create Folder Modal -->
-    <div id="modal-create-folder" class="hide fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
-            <h2 class="text-xl font-bold mb-4">สร้างโฟลเดอร์ใหม่</h2>
-            <input type="text" id="folder-name-input" placeholder="ชื่อโฟลเดอร์..." class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 mb-6">
-            <div class="flex gap-3">
-                <button onclick="closeModal('modal-create-folder')" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
-                <button onclick="createFolder()" class="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold">สร้าง</button>
-            </div>
+      <div class="p-4 border-b border-gray-100 dark:border-gray-800">
+        <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+          onclick="openModal('modal-profile')">
+          <img id="sidebar-avatar" src="" class="w-10 h-10 rounded-full object-cover" />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-bold truncate" id="sidebar-name">User</p>
+            <p class="text-[10px] text-gray-500">จัดการโปรไฟล์</p>
+          </div>
+          <i data-lucide="settings" class="w-4 h-4 text-gray-400"></i>
         </div>
-    </div>
+      </div>
 
-    <!-- Preview Modal -->
-    <div id="modal-preview" class="hide fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-md fade-in">
-        <div class="flex items-center justify-between p-4 border-b border-white/10 text-white">
-            <div class="flex items-center gap-3 min-w-0">
-                <i id="preview-icon" data-lucide="file" class="w-6 h-6 text-gray-400"></i>
-                <div>
-                    <h2 id="preview-name" class="font-bold truncate max-w-[200px] md:max-w-md">filename.ext</h2>
-                    <p id="preview-meta" class="text-xs text-gray-400">100 KB</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2">
-                <button id="btn-download" class="p-2 hover:bg-white/10 rounded-lg flex items-center gap-2 text-sm"><i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">โหลดเก็บไว้</span></button>
-                <button onclick="closeModal('modal-preview')" class="p-2 hover:bg-red-500/20 text-red-400 rounded-lg"><i data-lucide="x" class="w-6 h-6"></i></button>
-            </div>
+      <nav id="nav-folders" class="flex-1 overflow-y-auto p-4 space-y-1"></nav>
+
+      <div class="p-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+        <div class="mb-4 px-2 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+          <div class="flex items-center gap-2 mb-1">
+            <i data-lucide="database" class="w-4 h-4 text-indigo-500"></i>
+            <span class="text-xs font-bold text-gray-600 dark:text-gray-300">พื้นที่เก็บข้อมูล (IndexedDB)</span>
+          </div>
+          <div class="flex items-baseline gap-1">
+            <span id="storage-text" class="text-lg font-bold text-indigo-600 dark:text-indigo-400">0 MB</span>
+            <span class="text-[10px] text-gray-400">ใช้งานไปแล้ว</span>
+          </div>
         </div>
-        <div id="preview-content" class="flex-1 overflow-auto flex items-center justify-center p-4">
-            <!-- Content injected here -->
+
+        <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-sm font-medium transition-colors">
+          <i data-lucide="sun-moon" class="w-5 h-5"></i> เปลี่ยนโหมดสี
+        </button>
+        <button onclick="openModal('modal-share-import')" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-sm font-medium transition-colors text-emerald-600 dark:text-emerald-300">
+          <i data-lucide="link-2" class="w-5 h-5"></i> รับไฟล์จากโค้ดแชร์
+        </button>
+        <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors">
+          <i data-lucide="log-out" class="w-5 h-5"></i> ล็อกเอาต์
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 relative">
+      <div id="sidebar-overlay" class="hide fixed inset-0 bg-black/50 z-10 md:hidden" onclick="toggleSidebar()"></div>
+
+      <header class="h-20 glass flex items-center justify-between px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
+        <div class="flex items-center gap-3">
+          <button class="md:hidden p-2 text-gray-600 dark:text-gray-300" onclick="toggleSidebar()">
+            <i data-lucide="menu"></i>
+          </button>
+          <h2 class="text-xl font-bold truncate" id="current-view-title">หน้าแรก</h2>
         </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="openModal('modal-share-import')" class="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-200/70 font-semibold text-sm transition-all">
+            <i data-lucide="link-2" class="w-4 h-4"></i> รับโค้ดแชร์
+          </button>
+          <button onclick="openModal('modal-customize')" class="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-200 border border-pink-200 dark:border-pink-700 hover:bg-pink-200/70 font-semibold text-sm transition-all">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> ตกแต่ง
+          </button>
+          <button onclick="openModal('modal-create-folder')" class="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 font-semibold text-sm transition-all">
+            <i data-lucide="folder-plus" class="w-4 h-4"></i> สร้างโฟลเดอร์
+          </button>
+          <button onclick="document.getElementById('file-upload').click()" class="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition-all">
+            <i data-lucide="upload" class="w-4 h-4"></i> อัปโหลด
+          </button>
+          <input type="file" id="file-upload" multiple class="hidden" onchange="handleFileUpload(event)" />
+        </div>
+      </header>
+
+      <div id="drop-zone" class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 relative">
+        <div id="upload-loading" class="hide absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
+          <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p class="font-bold text-lg text-indigo-600 dark:text-indigo-400">กำลังจัดเก็บไฟล์เข้าระบบ...</p>
+        </div>
+
+        <div id="breadcrumb" class="hide flex items-center gap-2 text-sm text-gray-500 mb-6 bg-white dark:bg-gray-900 w-fit px-4 py-2 rounded-lg border border-gray-100 dark:border-gray-800">
+          <span class="hover:text-indigo-600 cursor-pointer flex items-center gap-1" onclick="navigateTo(null)"><i data-lucide="home" class="w-4 h-4"></i> หน้าแรก</span>
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          <span class="font-bold text-gray-900 dark:text-white flex items-center gap-1" id="breadcrumb-current"><i data-lucide="folder" class="w-4 h-4"></i> <span></span></span>
+        </div>
+
+        <div id="empty-state" class="hide h-full flex flex-col items-center justify-center text-center opacity-50 mt-20 pointer-events-none">
+          <i data-lucide="hard-drive-upload" class="w-20 h-20 mb-4 text-indigo-500"></i>
+          <h3 class="text-xl font-bold">พื้นที่ว่างเปล่า</h3>
+          <p class="text-sm mt-2">กดปุ่มอัปโหลดด้านบนเพื่อเพิ่มไฟล์ขนาดใหญ่และจัดการ/แชร์ได้ทันที</p>
+        </div>
+
+        <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modals -->
+  <div id="modal-profile" class="hide fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold">โปรไฟล์บัญชี</h2>
+        <button onclick="closeModal('modal-profile')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="flex flex-col items-center mb-6">
+        <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-upload').click()">
+          <img id="profile-modal-avatar" src="" class="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 dark:border-gray-700 shadow-md bg-white" />
+          <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <i data-lucide="camera" class="text-white w-8 h-8"></i>
+          </div>
+        </div>
+        <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="handleAvatarChange(event)" />
+        <p class="text-xs text-gray-400 mt-2">แตะเพื่เปลี่ยนรูป</p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">ชื่อแสดงผล</label>
+          <input type="text" id="profile-name-input" class="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <button onclick="saveProfile()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl mt-4">บันทึกข้อมูล</button>
+      </div>
     </div>
+  </div>
 
-    <!-- ========================================== -->
-    <!-- JAVASCRIPT LOGIC (WITH IndexedDB) -->
-    <!-- ========================================== -->
-    <script>
-        // --- 1. IndexedDB Wrapper (High Capacity Engine) ---
-        const DB_NAME = 'StudentCloudDB_V6';
-        const STORE_NAME = 'CloudStore';
-        let db;
+  <div id="modal-create-folder" class="hide fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+      <h2 class="text-xl font-bold mb-4">สร้างโฟลเดอร์ใหม่</h2>
+      <input type="text" id="folder-name-input" placeholder="ชื่อโฟลเดอร์..." class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 mb-6" />
+      <div class="flex gap-3">
+        <button onclick="closeModal('modal-create-folder')" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
+        <button onclick="createFolder()" class="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold">สร้าง</button>
+      </div>
+    </div>
+  </div>
 
-        // Initialize connection to browser's deep storage
-        const initDB = () => {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, 1);
-                request.onupgradeneeded = (event) => {
-                    db = event.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME);
-                    }
-                };
-                request.onsuccess = (event) => {
-                    db = event.target.result;
-                    resolve();
-                };
-                request.onerror = (event) => {
-                    console.error("IndexedDB error:", event.target.errorCode);
-                    reject(event.target.error);
-                };
+  <div id="modal-preview" class="hide fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-md fade-in">
+    <div class="flex items-center justify-between p-4 border-b border-white/10 text-white">
+      <div class="flex items-center gap-3 min-w-0">
+        <i id="preview-icon" data-lucide="file" class="w-6 h-6 text-gray-400"></i>
+        <div>
+          <h2 id="preview-name" class="font-bold truncate max-w-[200px] md:max-w-md">filename.ext</h2>
+          <p id="preview-meta" class="text-xs text-gray-400">100 KB</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-download" class="p-2 hover:bg-white/10 rounded-lg flex items-center gap-2 text-sm"><i data-lucide="download" class="w-5 h-5"></i> <span class="hidden sm:inline">โหลดเก็บไว้</span></button>
+        <button onclick="closeModal('modal-preview')" class="p-2 hover:bg-red-500/20 text-red-400 rounded-lg"><i data-lucide="x" class="w-6 h-6"></i></button>
+      </div>
+    </div>
+    <div id="preview-content" class="flex-1 overflow-auto flex items-center justify-center p-4"></div>
+  </div>
+
+  <div id="modal-item-action" class="hide fixed inset-0 z-[65] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+      <div class="flex justify-between items-center mb-5">
+        <h2 class="text-lg font-bold" id="item-action-title">จัดการรายการ</h2>
+        <button onclick="closeModal('modal-item-action')" class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"><i data-lucide="x"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-gray-500">ชื่อใหม่</label>
+          <input id="item-rename-input" type="text" class="mt-1 w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-500">ย้ายไปโฟลเดอร์</label>
+          <select id="item-move-select" class="mt-1 w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"></select>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="saveItemAction()" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold">บันทึก</button>
+          <button onclick="shareCurrentItem()" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">แชร์</button>
+          <button onclick="deleteCurrentItem()" class="px-4 py-2.5 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-customize" class="hide fixed inset-0 z-[62] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-gray-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+      <h2 class="text-xl font-bold mb-3">ตกแต่งพื้นที่ของคุณ ✨</h2>
+      <p class="text-sm text-gray-500 mb-4">เลือกธีมโทนสีพาสเทลสำหรับไฟล์/โฟลเดอร์</p>
+      <div class="grid grid-cols-3 gap-2" id="theme-options"></div>
+      <button onclick="closeModal('modal-customize')" class="w-full mt-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 font-semibold">ปิด</button>
+    </div>
+  </div>
+
+  <div id="modal-share-import" class="hide fixed inset-0 z-[62] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-gray-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
+      <h2 class="text-xl font-bold mb-2">รับไฟล์/โฟลเดอร์จากโค้ดแชร์</h2>
+      <p class="text-sm text-gray-500 mb-4">วางข้อความแชร์ที่ขึ้นต้นด้วย <span class="font-semibold">StudentCloud Share</span> เพื่อเพิ่มลงในพื้นที่ของคุณ</p>
+      <textarea id="share-code-input" rows="6" placeholder="StudentCloud Share&#10;xxxxx" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+      <div class="flex gap-3 mt-5">
+        <button onclick="closeModal('modal-share-import')" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold hover:bg-gray-200 transition-colors">ยกเลิก</button>
+        <button onclick="importSharedCode()" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">นำเข้า</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DB + constants
+    const DB_NAME = "StudentCloudDB_V8";
+    const STORE_NAME = "CloudStore";
+    const MAX_FILE_SIZE_MB = 1024;
+
+    const THEME_PRESETS = {
+      indigo: { folder: "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500", file: "text-blue-500 bg-blue-50 dark:bg-blue-900/30" },
+      peach: { folder: "bg-orange-50 dark:bg-orange-900/30 text-orange-500", file: "text-rose-500 bg-rose-50 dark:bg-rose-900/30" },
+      mint: { folder: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500", file: "text-teal-500 bg-teal-50 dark:bg-teal-900/30" }
+    };
+
+    let db;
+    let currentFolderId = null;
+    let isAuthenticated = false;
+    let currentItem = null;
+
+    let state = {
+      password: null,
+      user: {
+        name: "นักเรียน",
+        avatar: "https://ui-avatars.com/api/?name=St&background=6366f1&color=fff"
+      },
+      theme: "light",
+      folders: [],
+      files: [],
+      ui: { cardTheme: "indigo" }
+    };
+
+    // IndexedDB
+    const initDB = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
+      };
+      request.onsuccess = (event) => { db = event.target.result; resolve(); };
+      request.onerror = (event) => reject(event.target.error);
+    });
+
+    const idbSet = (key, value) => new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_NAME], "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put(value, key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    const idbGet = (key) => new Promise((resolve, reject) => {
+      const tx = db.transaction([STORE_NAME], "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(key);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    // App init
+    async function init() {
+      try {
+        await initDB();
+        await loadData();
+      } catch (e) {
+        showToast("ไม่สามารถเชื่อมต่อฐานข้อมูล IndexedDB ได้ (อาจใช้โหมดไม่ระบุตัวตน)", "error");
+      }
+
+      applyTheme();
+      renderThemeOptions();
+      requestPersistentStorage();
+      setupDropZone();
+
+      if (!state.password) {
+        showView("view-setup");
+      } else if (!isAuthenticated) {
+        document.getElementById("login-name").innerText = `สวัสดี, ${state.user.name}`;
+        document.getElementById("login-avatar").src = state.user.avatar;
+        showView("view-login");
+      } else {
+        showView("view-app");
+        updateUI();
+      }
+
+      lucide.createIcons();
+    }
+
+    async function loadData() {
+      try {
+        const saved = await idbGet("appState");
+        if (saved) state = { ...state, ...saved, ui: { cardTheme: "indigo", ...(saved.ui || {}) } };
+      } catch (e) {
+        console.error("Data load failed", e);
+      }
+    }
+
+    async function saveData() {
+      try {
+        await idbSet("appState", state);
+        await updateStorageIndicator();
+        return true;
+      } catch (e) {
+        showToast("พื้นที่เบราว์เซอร์อาจจะเต็ม! กรุณาลบไฟล์บางส่วน", "error");
+        return false;
+      }
+    }
+
+    async function requestPersistentStorage() {
+      try {
+        if (navigator.storage && navigator.storage.persist) await navigator.storage.persist();
+      } catch (e) {}
+    }
+
+    async function updateStorageIndicator() {
+      if (!isAuthenticated) return;
+      try {
+        if (navigator.storage?.estimate) {
+          const estimate = await navigator.storage.estimate();
+          const usedMB = ((estimate.usage || 0) / (1024 * 1024)).toFixed(1);
+          const quotaGB = ((estimate.quota || 0) / (1024 * 1024 * 1024)).toFixed(2);
+          document.getElementById("storage-text").innerText = `${usedMB} MB / ${quotaGB} GB`;
+        } else {
+          document.getElementById("storage-text").innerText = "ใช้งานอยู่";
+        }
+      } catch {}
+    }
+
+    // Auth
+    document.getElementById("form-setup").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pass = document.getElementById("setup-pass").value;
+      const conf = document.getElementById("setup-confirm").value;
+      if (pass !== conf) return showToast("รหัสผ่านไม่ตรงกัน!", "error");
+
+      state.password = btoa(pass);
+      isAuthenticated = true;
+      await saveData();
+      showToast("สร้างรหัสผ่านและความปลอดภัยสำเร็จ!", "success");
+      init();
+    });
+
+    document.getElementById("form-login").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const pass = document.getElementById("login-pass").value;
+      if (btoa(pass) === state.password) {
+        isAuthenticated = true;
+        document.getElementById("login-pass").value = "";
+        showToast("เข้าสู่ระบบสำเร็จ");
+        init();
+      } else {
+        showToast("รหัสผ่านไม่ถูกต้อง", "error");
+        document.getElementById("login-pass").value = "";
+      }
+    });
+
+    function logout() {
+      isAuthenticated = false;
+      init();
+    }
+
+    function resetDataConfirm() {
+      if (confirm('🚨 คำเตือนขั้นเด็ดขาด: การกระทำนี้จะลบ "ไฟล์ทั้งหมด" ทิ้งอย่างถาวร ยืนยันหรือไม่?')) {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => location.reload();
+        req.onerror = () => { localStorage.clear(); location.reload(); };
+      }
+    }
+
+    // Profile
+    function handleAvatarChange(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) return showToast("รูปโปรไฟล์ควรมีขนาดไม่เกิน 2MB", "error");
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        document.getElementById("profile-modal-avatar").src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function saveProfile() {
+      const newName = document.getElementById("profile-name-input").value.trim();
+      const newAvatar = document.getElementById("profile-modal-avatar").src;
+
+      if (newName) state.user.name = newName;
+      state.user.avatar = newAvatar;
+
+      if (await saveData()) {
+        showToast("อัปเดตโปรไฟล์แล้ว");
+        closeModal("modal-profile");
+        updateUI();
+      }
+    }
+
+    // File/Folder
+    async function createFolder() {
+      const name = document.getElementById("folder-name-input").value.trim();
+      if (!name) return;
+
+      const newFolder = {
+        id: "fd_" + Date.now(),
+        name,
+        parentId: currentFolderId,
+        color: state.ui.cardTheme
+      };
+
+      state.folders.push(newFolder);
+      if (await saveData()) {
+        document.getElementById("folder-name-input").value = "";
+        closeModal("modal-create-folder");
+        showToast(`สร้างโฟลเดอร์ "${name}" แล้ว`);
+        updateUI();
+      } else {
+        state.folders.pop();
+      }
+    }
+
+    async function handleFileUpload(e) {
+      const files = e.target.files;
+      if (!files.length) return;
+
+      document.getElementById("upload-loading").classList.remove("hide");
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+          showToast(`ข้ามไฟล์ ${file.name} (ใหญ่เกิน ${MAX_FILE_SIZE_MB}MB)`, "error");
+          continue;
+        }
+
+        try {
+          const dataUrl = await readFileAsDataURL(file);
+          const newFile = {
+            id: "fi_" + Date.now() + Math.random().toString(16).slice(2),
+            name: file.name,
+            size: file.size,
+            type: file.type || getExtType(file.name),
+            data: dataUrl,
+            folderId: currentFolderId,
+            date: Date.now(),
+            color: state.ui.cardTheme
+          };
+
+          state.files.push(newFile);
+          await saveData();
+          showToast(`อัปโหลด ${file.name} สำเร็จ`);
+        } catch (err) {
+          console.error(err);
+          showToast(`เกิดข้อผิดพลาดกับไฟล์ ${file.name}`, "error");
+        }
+      }
+
+      document.getElementById("upload-loading").classList.add("hide");
+      updateUI();
+      e.target.value = "";
+    }
+
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function collectNestedFolderIds(rootId) {
+      const ids = [rootId];
+      for (let i = 0; i < ids.length; i++) {
+        state.folders.filter(f => f.parentId === ids[i]).forEach(f => ids.push(f.id));
+      }
+      return ids;
+    }
+
+    async function deleteItem(id, isFolder) {
+      if (!confirm("ยืนยันการลบทิ้ง?")) return;
+
+      if (isFolder) {
+        const nestedIds = collectNestedFolderIds(id);
+        state.files = state.files.filter(f => !nestedIds.includes(f.folderId));
+        state.folders = state.folders.filter(f => !nestedIds.includes(f.id));
+        if (nestedIds.includes(currentFolderId)) currentFolderId = null;
+      } else {
+        state.files = state.files.filter(f => f.id !== id);
+      }
+
+      await saveData();
+      showToast("ลบรายการสำเร็จ");
+      updateUI();
+    }
+
+    // Rendering
+    function navigateTo(folderId) {
+      currentFolderId = folderId;
+      updateUI();
+    }
+
+    function updateUI() {
+      if (!isAuthenticated) return;
+
+      document.getElementById("sidebar-avatar").src = state.user.avatar;
+      document.getElementById("sidebar-name").innerText = state.user.name;
+      document.getElementById("profile-modal-avatar").src = state.user.avatar;
+      document.getElementById("profile-name-input").value = state.user.name;
+
+      updateStorageIndicator();
+
+      const currentFolders = state.folders.filter(f => f.parentId === currentFolderId);
+      const currentFiles = state.files.filter(f => f.folderId === currentFolderId);
+      const isEmpty = currentFolders.length === 0 && currentFiles.length === 0;
+      document.getElementById("empty-state").classList.toggle("hide", !isEmpty);
+
+      if (currentFolderId === null) {
+        document.getElementById("current-view-title").innerText = "หน้าแรก";
+        document.getElementById("breadcrumb").classList.add("hide");
+      } else {
+        const folder = state.folders.find(f => f.id === currentFolderId);
+        document.getElementById("current-view-title").innerText = folder ? folder.name : "โฟลเดอร์";
+        document.getElementById("breadcrumb").classList.remove("hide");
+        document.querySelector("#breadcrumb-current span").innerText = folder ? folder.name : "";
+      }
+
+      const navHtml = [
+        `<button onclick="navigateTo(null)" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${currentFolderId === null ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="home" class="w-5 h-5"></i> หน้าแรก</button>`,
+        `<div class="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4">โฟลเดอร์ของคุณ</div>`
+      ];
+      state.folders.filter(f => f.parentId === null).forEach(f => {
+        const isActive = currentFolderId === f.id;
+        navHtml.push(`<button onclick="navigateTo('${f.id}')" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="folder" class="w-4 h-4"></i> <span class="truncate">${f.name}</span></button>`);
+      });
+      document.getElementById("nav-folders").innerHTML = navHtml.join("");
+
+      let gridHtml = "";
+
+      currentFolders.forEach(f => {
+        const folderTheme = THEME_PRESETS[f.color || state.ui.cardTheme] || THEME_PRESETS.indigo;
+        gridHtml += `
+          <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group cursor-pointer" onclick="navigateTo('${f.id}')">
+            <div class="flex justify-between items-start mb-4">
+              <div class="w-12 h-12 ${folderTheme.folder} rounded-xl flex items-center justify-center">
+                <i data-lucide="folder" class="w-6 h-6"></i>
+              </div>
+              <button onclick="event.stopPropagation(); openItemAction('${f.id}', true)" class="p-1.5 text-gray-300 hover:text-indigo-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+            </div>
+            <h3 class="font-bold text-sm truncate">${f.name}</h3>
+            <p class="text-[10px] text-gray-400 mt-1 uppercase">โฟลเดอร์</p>
+          </div>`;
+      });
+
+      currentFiles.forEach(f => {
+        const icon = f.type.includes("image") ? "image" : f.type.includes("text") || f.type.includes("json") ? "file-code" : f.type.includes("video") ? "video" : "file-text";
+        const fileTheme = THEME_PRESETS[f.color || state.ui.cardTheme] || THEME_PRESETS.indigo;
+
+        gridHtml += `
+          <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group">
+            <div class="flex justify-between items-start mb-4">
+              <div class="w-12 h-12 ${fileTheme.file} rounded-xl flex items-center justify-center cursor-pointer" onclick="openPreview('${f.id}')">
+                <i data-lucide="${icon}" class="w-6 h-6"></i>
+              </div>
+              <button onclick="openItemAction('${f.id}', false)" class="p-1.5 text-gray-300 hover:text-indigo-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i data-lucide="more-horizontal" class="w-4 h-4"></i></button>
+            </div>
+            <div class="cursor-pointer" onclick="openPreview('${f.id}')">
+              <h3 class="font-bold text-sm truncate" title="${f.name}">${f.name}</h3>
+              <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold">${formatBytes(f.size)} • ${new Date(f.date).toLocaleDateString("th-TH")}</p>
+            </div>
+          </div>`;
+      });
+
+      document.getElementById("file-grid").innerHTML = gridHtml;
+      lucide.createIcons();
+    }
+
+    function openItemAction(id, isFolder) {
+      currentItem = { id, isFolder };
+      const item = isFolder ? state.folders.find(f => f.id === id) : state.files.find(f => f.id === id);
+      if (!item) return;
+
+      document.getElementById("item-action-title").innerText = `จัดการ: ${item.name}`;
+      document.getElementById("item-rename-input").value = item.name;
+
+      const select = document.getElementById("item-move-select");
+      const options = ['<option value="">หน้าแรก</option>'];
+      state.folders.filter(f => !isFolder || f.id !== id).forEach(f => options.push(`<option value="${f.id}">${f.name}</option>`));
+      select.innerHTML = options.join("");
+      select.value = item.parentId || item.folderId || "";
+
+      openModal("modal-item-action");
+      lucide.createIcons();
+    }
+
+    async function saveItemAction() {
+      if (!currentItem) return;
+      const newName = document.getElementById("item-rename-input").value.trim();
+      const moveTo = document.getElementById("item-move-select").value || null;
+
+      if (currentItem.isFolder) {
+        const folder = state.folders.find(f => f.id === currentItem.id);
+        if (!folder) return;
+        if (newName) folder.name = newName;
+
+        if (moveTo !== folder.id) {
+          const nestedIds = collectNestedFolderIds(folder.id);
+          if (nestedIds.includes(moveTo)) {
+            showToast("ย้ายโฟลเดอร์เข้าโฟลเดอร์ย่อยของตัวเองไม่ได้", "error");
+            return;
+          }
+          folder.parentId = moveTo;
+        }
+      } else {
+        const file = state.files.find(f => f.id === currentItem.id);
+        if (!file) return;
+        if (newName) file.name = newName;
+        file.folderId = moveTo;
+      }
+
+      await saveData();
+      closeModal("modal-item-action");
+      showToast("อัปเดตรายการแล้ว");
+      updateUI();
+    }
+
+    function deleteCurrentItem() {
+      if (!currentItem) return;
+      deleteItem(currentItem.id, currentItem.isFolder);
+      closeModal("modal-item-action");
+    }
+
+    async function shareCurrentItem() {
+      if (!currentItem) return;
+      const item = currentItem.isFolder ? state.folders.find(f => f.id === currentItem.id) : state.files.find(f => f.id === currentItem.id);
+      if (!item) return;
+
+      const payload = currentItem.isFolder
+        ? (() => {
+            const nestedFolderIds = collectNestedFolderIds(item.id);
+            return {
+              type: "folder",
+              rootId: item.id,
+              folders: state.folders.filter(f => nestedFolderIds.includes(f.id)),
+              files: state.files.filter(f => nestedFolderIds.includes(f.folderId))
+            };
+          })()
+        : { type: "file", data: item };
+
+      const shareCode = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      const shareText = `StudentCloud Share\n${shareCode}`;
+
+      if (navigator.share) {
+        try { await navigator.share({ title: "แชร์จาก StudentCloud", text: shareText }); } catch {}
+      }
+
+      await navigator.clipboard.writeText(shareText);
+      showToast("คัดลอกโค้ดแชร์แล้ว");
+    }
+
+    function makeUniqueName(name, collection) {
+      if (!collection.includes(name)) return name;
+      const dotIndex = name.lastIndexOf(".");
+      const hasExt = dotIndex > 0;
+      const base = hasExt ? name.slice(0, dotIndex) : name;
+      const ext = hasExt ? name.slice(dotIndex) : "";
+      let i = 1;
+      while (collection.includes(`${base} (${i})${ext}`)) i++;
+      return `${base} (${i})${ext}`;
+    }
+
+    async function importSharedCode() {
+      const raw = document.getElementById("share-code-input").value.trim();
+      if (!raw) return showToast("กรุณาวางโค้ดแชร์ก่อน", "error");
+
+      const shareCode = raw.startsWith("StudentCloud Share") ? raw.split("\n").slice(1).join("").trim() : raw;
+
+      try {
+        const decoded = decodeURIComponent(escape(atob(shareCode)));
+        const parsed = JSON.parse(decoded);
+
+        if (parsed.type === "file" && parsed.data) {
+          const folderFiles = state.files.filter(f => f.folderId === currentFolderId).map(f => f.name);
+          state.files.push({
+            ...parsed.data,
+            id: "fi_" + Date.now() + Math.random().toString(16).slice(2),
+            folderId: currentFolderId,
+            name: makeUniqueName(parsed.data.name, folderFiles)
+          });
+        } else if (parsed.type === "folder" && Array.isArray(parsed.folders) && Array.isArray(parsed.files)) {
+          const idMap = new Map();
+          const root = parsed.folders.find(f => f.id === parsed.rootId) || parsed.folders[0];
+          const rootNamePool = state.folders.filter(f => f.parentId === currentFolderId).map(f => f.name);
+
+          parsed.folders.forEach((folder, index) => {
+            const newId = "fd_" + Date.now() + "_" + index + Math.random().toString(16).slice(2, 6);
+            idMap.set(folder.id, newId);
+          });
+
+          parsed.folders.forEach(folder => {
+            const isRoot = root && folder.id === root.id;
+            const siblingPool = state.folders
+              .filter(f => f.parentId === (isRoot ? currentFolderId : idMap.get(folder.parentId) || currentFolderId))
+              .map(f => f.name);
+
+            state.folders.push({
+              ...folder,
+              id: idMap.get(folder.id),
+              parentId: isRoot ? currentFolderId : idMap.get(folder.parentId) || currentFolderId,
+              name: isRoot ? makeUniqueName(folder.name, rootNamePool) : makeUniqueName(folder.name, siblingPool)
             });
-        };
+          });
 
-        const idbSet = (key, value) => {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.put(value, key);
-                request.onsuccess = () => resolve();
-                request.onerror = () => reject(request.error);
+          parsed.files.forEach((file, index) => {
+            const siblingPool = state.files
+              .filter(f => f.folderId === (idMap.get(file.folderId) || currentFolderId))
+              .map(f => f.name);
+
+            state.files.push({
+              ...file,
+              id: "fi_" + Date.now() + "_" + index + Math.random().toString(16).slice(2, 6),
+              folderId: idMap.get(file.folderId) || currentFolderId,
+              name: makeUniqueName(file.name, siblingPool)
             });
-        };
-
-        const idbGet = (key) => {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get(key);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-        };
-
-        // --- 2. State Management ---
-        let state = {
-            password: null,
-            user: {
-                name: 'นักเรียน',
-                avatar: 'https://ui-avatars.com/api/?name=St&background=6366f1&color=fff'
-            },
-            theme: 'light',
-            folders: [],
-            files: []
-        };
-
-        let currentFolderId = null;
-        let isAuthenticated = false;
-
-        // --- 3. App Initialization ---
-        async function init() {
-            try {
-                await initDB();
-                await loadData();
-            } catch (err) {
-                showToast("ไม่สามารถเชื่อมต่อฐานข้อมูล IndexedDB ได้ (อาจใช้โหมดไม่ระบุตัวตน)", "error");
-            }
-
-            applyTheme();
-            
-            if (!state.password) {
-                showView('view-setup');
-            } else if (!isAuthenticated) {
-                document.getElementById('login-name').innerText = `สวัสดี, ${state.user.name}`;
-                document.getElementById('login-avatar').src = state.user.avatar;
-                showView('view-login');
-            } else {
-                showView('view-app');
-                updateUI();
-            }
-            lucide.createIcons();
+          });
+        } else {
+          return showToast("รูปแบบโค้ดแชร์ไม่ถูกต้อง", "error");
         }
 
-        // --- 4. Data Operations ---
-        async function loadData() {
-            try {
-                const saved = await idbGet('appState');
-                if (saved) state = { ...state, ...saved };
-            } catch(e) { console.error("Data load failed", e); }
-        }
+        await saveData();
+        closeModal("modal-share-import");
+        document.getElementById("share-code-input").value = "";
+        showToast("นำเข้าข้อมูลที่แชร์เรียบร้อยแล้ว");
+        updateUI();
+      } catch {
+        showToast("ไม่สามารถอ่านโค้ดแชร์ได้", "error");
+      }
+    }
 
-        async function saveData() {
-            try {
-                await idbSet('appState', state);
-                await updateStorageIndicator();
-                return true;
-            } catch (e) {
-                showToast('พื้นที่เบราว์เซอร์อาจจะเต็ม! กรุณาลบไฟล์บางส่วน', 'error');
-                return false;
-            }
-        }
+    function setupDropZone() {
+      const dropZone = document.getElementById("drop-zone");
+      if (!dropZone || dropZone.dataset.ready) return;
+      dropZone.dataset.ready = "1";
 
-        async function updateStorageIndicator() {
-            if(!isAuthenticated) return;
-            try {
-                if (navigator.storage && navigator.storage.estimate) {
-                    const estimate = await navigator.storage.estimate();
-                    const usedMB = (estimate.usage / (1024 * 1024)).toFixed(1);
-                    document.getElementById('storage-text').innerText = `${usedMB} MB`;
-                } else {
-                    document.getElementById('storage-text').innerText = 'ใช้งานอยู่';
-                }
-            } catch(e) { console.log(e); }
-        }
-
-        // --- 5. Authentication Logic ---
-        document.getElementById('form-setup').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const pass = document.getElementById('setup-pass').value;
-            const conf = document.getElementById('setup-confirm').value;
-            if (pass !== conf) return showToast('รหัสผ่านไม่ตรงกัน!', 'error');
-            
-            state.password = btoa(pass); 
-            isAuthenticated = true;
-            await saveData();
-            showToast('สร้างรหัสผ่านและความปลอดภัยสำเร็จ!', 'success');
-            init();
+      ["dragenter", "dragover"].forEach(eventName => {
+        dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropZone.classList.add("ring-2", "ring-indigo-400", "ring-offset-2", "dark:ring-offset-gray-900");
         });
+      });
 
-        document.getElementById('form-login').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const pass = document.getElementById('login-pass').value;
-            if (btoa(pass) === state.password) {
-                isAuthenticated = true;
-                document.getElementById('login-pass').value = '';
-                showToast('เข้าสู่ระบบสำเร็จ');
-                init();
-            } else {
-                showToast('รหัสผ่านไม่ถูกต้อง', 'error');
-                document.getElementById('login-pass').value = '';
-            }
+      ["dragleave", "drop"].forEach(eventName => {
+        dropZone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropZone.classList.remove("ring-2", "ring-indigo-400", "ring-offset-2", "dark:ring-offset-gray-900");
         });
+      });
 
-        function logout() {
-            isAuthenticated = false;
-            init();
+      dropZone.addEventListener("drop", (event) => {
+        const droppedFiles = event.dataTransfer?.files;
+        if (!droppedFiles || droppedFiles.length === 0) return;
+        handleFileUpload({ target: { files: droppedFiles, value: "" } });
+      });
+    }
+
+    function renderThemeOptions() {
+      const el = document.getElementById("theme-options");
+      if (!el) return;
+      el.innerHTML = Object.keys(THEME_PRESETS).map(key => `
+        <button onclick="setCardTheme('${key}')" class="p-3 rounded-xl border ${state.ui.cardTheme === key ? 'border-indigo-500' : 'border-gray-200 dark:border-gray-700'}">
+          <div class="h-7 rounded-lg ${THEME_PRESETS[key].folder}"></div>
+          <p class="text-xs mt-2 font-semibold capitalize">${key}</p>
+        </button>
+      `).join("");
+    }
+
+    async function setCardTheme(theme) {
+      state.ui.cardTheme = theme;
+      await saveData();
+      renderThemeOptions();
+      updateUI();
+    }
+
+    // Preview + util
+    function openPreview(fileId) {
+      const file = state.files.find(f => f.id === fileId);
+      if (!file) return;
+
+      document.getElementById("preview-name").innerText = file.name;
+      document.getElementById("preview-meta").innerText = `${formatBytes(file.size)} • ${file.type}`;
+
+      const contentArea = document.getElementById("preview-content");
+      contentArea.innerHTML = "";
+
+      document.getElementById("btn-download").onclick = () => {
+        const a = document.createElement("a");
+        a.href = file.data;
+        a.download = file.name;
+        a.click();
+      };
+
+      if (file.type.includes("image")) {
+        contentArea.innerHTML = `<img src="${file.data}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">`;
+      } else if (file.type.includes("video")) {
+        contentArea.innerHTML = `<video controls class="max-w-full max-h-full rounded-lg shadow-2xl"><source src="${file.data}" type="${file.type}"></video>`;
+      } else if (file.type.includes("text") || file.type.includes("json") || file.type.includes("javascript") || file.type.includes("html")) {
+        try {
+          const base64Str = file.data.split(",")[1];
+          const decodedText = decodeURIComponent(escape(window.atob(base64Str)));
+          contentArea.innerHTML = `<div class="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-green-400 border border-white/10 text-left"><pre>${decodedText.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></div>`;
+        } catch {
+          contentArea.innerHTML = `<div class="text-white text-center"><i data-lucide="alert-triangle" class="w-12 h-12 mx-auto mb-2 text-yellow-500"></i><p>ไม่สามารถอ่านข้อความได้</p></div>`;
         }
+      } else {
+        contentArea.innerHTML = `
+          <div class="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10">
+            <i data-lucide="file-question" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
+            <h3 class="text-xl font-bold mb-2">ไม่มีตัวอย่างแสดงผล</h3>
+            <p class="text-sm text-gray-400">กดปุ่มโหลดเพื่อเปิดไฟล์ในเครื่องของคุณ</p>
+          </div>`;
+      }
 
-        function resetDataConfirm() {
-            if(confirm('🚨 คำเตือนขั้นเด็ดขาด: การกระทำนี้จะลบ "ไฟล์ทั้งหมด" ทิ้งอย่างถาวร ยืนยันหรือไม่?')) {
-                const req = indexedDB.deleteDatabase(DB_NAME);
-                req.onsuccess = () => location.reload();
-                req.onerror = () => { localStorage.clear(); location.reload(); }
-            }
-        }
+      openModal("modal-preview");
+      lucide.createIcons();
+    }
 
-        // --- 6. Profile Management ---
-        function handleAvatarChange(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (file.size > 2 * 1024 * 1024) return showToast('รูปโปรไฟล์ควรมีขนาดไม่เกิน 2MB', 'error');
+    function getExtType(filename) {
+      const ext = filename.split(".").pop().toLowerCase();
+      if (["jpg","jpeg","png","gif","webp"].includes(ext)) return "image/" + ext;
+      if (["mp4","webm","ogg"].includes(ext)) return "video/" + ext;
+      if (["txt","html","css","js","json","py"].includes(ext)) return "text/plain";
+      return "application/octet-stream";
+    }
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                document.getElementById('profile-modal-avatar').src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+    function formatBytes(bytes) {
+      if (bytes === 0) return "0 B";
+      const k = 1024, sizes = ["B","KB","MB","GB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    }
 
-        async function saveProfile() {
-            const newName = document.getElementById('profile-name-input').value.trim();
-            const newAvatar = document.getElementById('profile-modal-avatar').src;
-            
-            if (newName) state.user.name = newName;
-            state.user.avatar = newAvatar;
-            
-            if(await saveData()) {
-                showToast('อัปเดตโปรไฟล์แล้ว');
-                closeModal('modal-profile');
-                updateUI();
-            }
-        }
+    // UI helpers
+    function showView(viewId) {
+      ["view-setup","view-login","view-app"].forEach(v => document.getElementById(v).classList.add("hide"));
+      document.getElementById(viewId).classList.remove("hide");
+    }
 
-        // --- 7. File & Folder Operations ---
-        async function createFolder() {
-            const name = document.getElementById('folder-name-input').value.trim();
-            if (!name) return;
-            
-            const newFolder = {
-                id: 'fd_' + Date.now(),
-                name: name,
-                parentId: currentFolderId
-            };
-            
-            state.folders.push(newFolder);
-            if(await saveData()) {
-                document.getElementById('folder-name-input').value = '';
-                closeModal('modal-create-folder');
-                showToast(`สร้างโฟลเดอร์ "${name}" แล้ว`);
-                updateUI();
-            } else {
-                state.folders.pop(); 
-            }
-        }
+    function openModal(id) { document.getElementById(id).classList.remove("hide"); }
+    function closeModal(id) { document.getElementById(id).classList.add("hide"); }
 
-        async function handleFileUpload(e) {
-            const files = e.target.files;
-            if (!files.length) return;
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      const overlay = document.getElementById("sidebar-overlay");
+      sidebar.classList.toggle("-translate-x-full");
+      overlay.classList.toggle("hide");
+    }
 
-            document.getElementById('upload-loading').classList.remove('hide');
+    async function toggleTheme() {
+      state.theme = state.theme === "light" ? "dark" : "light";
+      applyTheme();
+      await saveData();
+    }
 
-            for(let i=0; i<files.length; i++) {
-                const file = files[i];
-                
-                // 🔥 NEW LIMIT: 50MB per file
-                if (file.size > 50 * 1024 * 1024) {
-                    showToast(`ข้ามไฟล์ ${file.name} (ใหญ่เกิน 50MB)`, 'error');
-                    continue;
-                }
+    function applyTheme() {
+      if (state.theme === "dark") document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+    }
 
-                try {
-                    const dataUrl = await readFileAsDataURL(file);
-                    const newFile = {
-                        id: 'fi_' + Date.now() + Math.random().toString(16).slice(2),
-                        name: file.name,
-                        size: file.size,
-                        type: file.type || getExtType(file.name),
-                        data: dataUrl,
-                        folderId: currentFolderId,
-                        date: new Date().getTime()
-                    };
-                    
-                    state.files.push(newFile);
-                    await saveData();
-                    showToast(`อัปโหลด ${file.name} สำเร็จ`);
-                } catch (err) {
-                    showToast(`เกิดข้อผิดพลาดกับไฟล์ ${file.name}`, 'error');
-                    console.error(err);
-                }
-            }
-            
-            document.getElementById('upload-loading').classList.add('hide');
-            updateUI();
-            e.target.value = ''; 
-        }
+    function showToast(msg, type = "success") {
+      const toast = document.createElement("div");
+      const bgColor = type === "error" ? "bg-red-500" : "bg-gray-900 dark:bg-white";
+      const textColor = type === "error" ? "text-white" : "text-white dark:text-gray-900";
+      toast.className = `flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all fade-in font-medium text-sm ${bgColor} ${textColor}`;
+      toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : type === 'info' ? 'loader' : 'check-circle-2'}" class="w-5 h-5 ${type === 'success' ? 'text-green-400' : type === 'info' ? 'animate-spin' : ''}"></i> ${msg}`;
 
-        // Helper for async file reading
-        function readFileAsDataURL(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = () => reject(reader.error);
-                reader.readAsDataURL(file);
-            });
-        }
+      document.getElementById("toast-container").appendChild(toast);
+      lucide.createIcons();
 
-        async function deleteItem(id, isFolder) {
-            if(!confirm('ยืนยันการลบทิ้ง?')) return;
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(-10px)";
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
 
-            if (isFolder) {
-                state.files = state.files.filter(f => f.folderId !== id);
-                state.folders = state.folders.filter(f => f.id !== id);
-            } else {
-                state.files = state.files.filter(f => f.id !== id);
-            }
-            
-            await saveData();
-            showToast('ลบรายการสำเร็จ');
-            updateUI();
-        }
-
-        // --- 8. Navigation & Rendering ---
-        function navigateTo(folderId) {
-            currentFolderId = folderId;
-            updateUI();
-        }
-
-        function updateUI() {
-            if(!isAuthenticated) return;
-
-            document.getElementById('sidebar-avatar').src = state.user.avatar;
-            document.getElementById('sidebar-name').innerText = state.user.name;
-            document.getElementById('profile-modal-avatar').src = state.user.avatar;
-            document.getElementById('profile-name-input').value = state.user.name;
-
-            updateStorageIndicator();
-
-            const currentFolders = state.folders.filter(f => f.parentId === currentFolderId);
-            const currentFiles = state.files.filter(f => f.folderId === currentFolderId);
-            const isEmpty = currentFolders.length === 0 && currentFiles.length === 0;
-
-            document.getElementById('empty-state').classList.toggle('hide', !isEmpty);
-            
-            if (currentFolderId === null) {
-                document.getElementById('current-view-title').innerText = 'หน้าแรก';
-                document.getElementById('breadcrumb').classList.add('hide');
-            } else {
-                const folder = state.folders.find(f => f.id === currentFolderId);
-                document.getElementById('current-view-title').innerText = folder ? folder.name : 'โฟลเดอร์';
-                document.getElementById('breadcrumb').classList.remove('hide');
-                document.querySelector('#breadcrumb-current span').innerText = folder ? folder.name : '';
-            }
-
-            const navHtml = [
-                `<button onclick="navigateTo(null)" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${currentFolderId === null ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="home" class="w-5 h-5"></i> หน้าแรก</button>`,
-                `<div class="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-4">โฟลเดอร์ของคุณ</div>`
-            ];
-            state.folders.filter(f => f.parentId === null).forEach(f => {
-                const isActive = currentFolderId === f.id;
-                navHtml.push(`<button onclick="navigateTo('${f.id}')" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}"><i data-lucide="folder" class="w-4 h-4"></i> <span class="truncate">${f.name}</span></button>`);
-            });
-            document.getElementById('nav-folders').innerHTML = navHtml.join('');
-
-            let gridHtml = '';
-            
-            currentFolders.forEach(f => {
-                gridHtml += `
-                <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group cursor-pointer" onclick="navigateTo('${f.id}')">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 rounded-xl flex items-center justify-center">
-                            <i data-lucide="folder" class="w-6 h-6"></i>
-                        </div>
-                        <button onclick="event.stopPropagation(); deleteItem('${f.id}', true)" class="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                    <h3 class="font-bold text-sm truncate">${f.name}</h3>
-                    <p class="text-[10px] text-gray-400 mt-1 uppercase">โฟลเดอร์</p>
-                </div>`;
-            });
-
-            currentFiles.forEach(f => {
-                const icon = f.type.includes('image') ? 'image' : f.type.includes('text') || f.type.includes('json') ? 'file-code' : f.type.includes('video') ? 'video' : 'file-text';
-                const colorClass = f.type.includes('image') ? 'text-purple-500 bg-purple-50 dark:bg-purple-900/30' : f.type.includes('video') ? 'text-pink-500 bg-pink-50 dark:bg-pink-900/30' : 'text-blue-500 bg-blue-50 dark:bg-blue-900/30';
-                
-                gridHtml += `
-                <div class="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col hover:shadow-lg transition-all group">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="w-12 h-12 ${colorClass} rounded-xl flex items-center justify-center cursor-pointer" onclick="openPreview('${f.id}')">
-                            <i data-lucide="${icon}" class="w-6 h-6"></i>
-                        </div>
-                        <button onclick="deleteItem('${f.id}', false)" class="p-1.5 text-gray-300 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                    </div>
-                    <div class="cursor-pointer" onclick="openPreview('${f.id}')">
-                        <h3 class="font-bold text-sm truncate" title="${f.name}">${f.name}</h3>
-                        <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold">${formatBytes(f.size)} • ${new Date(f.date).toLocaleDateString('th-TH')}</p>
-                    </div>
-                </div>`;
-            });
-
-            document.getElementById('file-grid').innerHTML = gridHtml;
-            lucide.createIcons();
-        }
-
-        // --- 9. Preview & Utility Functions ---
-        function openPreview(fileId) {
-            const file = state.files.find(f => f.id === fileId);
-            if(!file) return;
-
-            document.getElementById('preview-name').innerText = file.name;
-            document.getElementById('preview-meta').innerText = `${formatBytes(file.size)} • ${file.type}`;
-            
-            const contentArea = document.getElementById('preview-content');
-            contentArea.innerHTML = ''; 
-            
-            document.getElementById('btn-download').onclick = () => {
-                const a = document.createElement('a');
-                a.href = file.data;
-                a.download = file.name;
-                a.click();
-            };
-
-            if (file.type.includes('image')) {
-                contentArea.innerHTML = `<img src="${file.data}" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">`;
-            } else if (file.type.includes('video')) {
-                contentArea.innerHTML = `<video controls class="max-w-full max-h-full rounded-lg shadow-2xl"><source src="${file.data}" type="${file.type}"></video>`;
-            } else if (file.type.includes('text') || file.type.includes('json') || file.type.includes('javascript') || file.type.includes('html')) {
-                try {
-                    const base64Str = file.data.split(',')[1];
-                    const decodedText = decodeURIComponent(escape(window.atob(base64Str)));
-                    contentArea.innerHTML = `<div class="w-full max-w-4xl h-full bg-gray-900 rounded-xl p-6 overflow-auto font-mono text-sm text-green-400 border border-white/10 text-left"><pre>${decodedText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></div>`;
-                } catch(e) {
-                    contentArea.innerHTML = `<div class="text-white text-center"><i data-lucide="alert-triangle" class="w-12 h-12 mx-auto mb-2 text-yellow-500"></i><p>ไม่สามารถอ่านข้อความได้</p></div>`;
-                }
-            } else {
-                contentArea.innerHTML = `
-                    <div class="text-center text-white p-10 bg-white/5 rounded-3xl border border-white/10">
-                        <i data-lucide="file-question" class="w-16 h-16 mx-auto mb-4 opacity-50"></i>
-                        <h3 class="text-xl font-bold mb-2">ไม่มีตัวอย่างแสดงผล</h3>
-                        <p class="text-sm text-gray-400">กดปุ่มโหลดเพื่อเปิดไฟล์ในเครื่องของคุณ</p>
-                    </div>`;
-            }
-
-            openModal('modal-preview');
-            lucide.createIcons();
-        }
-
-        function getExtType(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if(['jpg','jpeg','png','gif','webp'].includes(ext)) return 'image/'+ext;
-            if(['mp4','webm','ogg'].includes(ext)) return 'video/'+ext;
-            if(['txt','html','css','js','json','py'].includes(ext)) return 'text/plain';
-            return 'application/octet-stream';
-        }
-
-        function formatBytes(bytes) {
-            if(bytes === 0) return '0 B';
-            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'], i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-        }
-
-        // --- UI Helpers ---
-        function showView(viewId) {
-            ['view-setup', 'view-login', 'view-app'].forEach(v => document.getElementById(v).classList.add('hide'));
-            document.getElementById(viewId).classList.remove('hide');
-        }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hide'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hide'); }
-
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebar-overlay');
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('hide');
-        }
-
-        async function toggleTheme() {
-            state.theme = state.theme === 'light' ? 'dark' : 'light';
-            applyTheme();
-            await saveData();
-        }
-
-        function applyTheme() {
-            if (state.theme === 'dark') document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
-        }
-
-        function showToast(msg, type = 'success') {
-            const toast = document.createElement('div');
-            const bgColor = type === 'error' ? 'bg-red-500' : 'bg-gray-900 dark:bg-white';
-            const textColor = type === 'error' ? 'text-white' : 'text-white dark:text-gray-900';
-            
-            toast.className = `flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all fade-in font-medium text-sm ${bgColor} ${textColor}`;
-            toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : type === 'info' ? 'loader' : 'check-circle-2'}" class="w-5 h-5 ${type === 'success' ? 'text-green-400' : type === 'info' ? 'animate-spin' : ''}"></i> ${msg}`;
-            
-            document.getElementById('toast-container').appendChild(toast);
-            lucide.createIcons();
-            
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(-10px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // Run App
-        window.onload = init;
-
-    </script>
+    window.onload = init;
+  </script>
 </body>
 </html>
-
-
