@@ -388,15 +388,34 @@
     }
 
     document.getElementById("form-setup").addEventListener("submit", async e => {
-      e.preventDefault();
-      const pass = setupPass.value, conf = setupConfirm.value;
-      if (pass !== conf) return showToast("รหัสผ่านไม่ตรงกัน!", "error");
-      state.password = btoa(pass);
-      isAuthenticated = true;
-      await saveData();
-      showToast("สร้างรหัสผ่านสำเร็จ");
-      init();
-    });
+  e.preventDefault();
+  
+  // ดึงค่าโดยระบุ ID ให้ชัดเจน
+  const pass = document.getElementById("setup-pass").value;
+  const conf = document.getElementById("setup-confirm").value;
+  
+  if (pass !== conf) {
+    showToast("รหัสผ่านไม่ตรงกัน!", "error");
+    return;
+  }
+  
+  if (pass.length < 4) {
+    showToast("รหัสผ่านต้องมีอย่างน้อย 4 ตัว", "error");
+    return;
+  }
+
+  state.password = btoa(pass);
+  isAuthenticated = true;
+  
+  const saved = await saveData(); // รอให้เซฟลง IndexedDB เสร็จก่อน
+  if (saved) {
+    showToast("สร้างรหัสผ่านสำเร็จ");
+    // เปลี่ยนหน้าไปที่หน้าแอปโดยตรง ไม่ต้องรอ init ซ้ำ
+    showView("view-app");
+    updateUI();
+  }
+});
+
 
     document.getElementById("form-login").addEventListener("submit", e => {
       e.preventDefault();
