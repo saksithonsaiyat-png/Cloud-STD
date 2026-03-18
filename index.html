@@ -33,6 +33,17 @@
     .hide { display: none !important; }
     .fade-in { animation: fadeIn .25s ease-in-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .workspace-bg-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      transition: filter .2s ease, opacity .2s ease;
+      pointer-events: none;
+    }
   </style>
 </head>
 
@@ -124,7 +135,8 @@
       </div>
     </aside>
 
-    <main class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 relative">
+    <main class="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
+      <div id="workspace-bg" class="workspace-bg-layer hide"></div>
       <div id="sidebar-overlay" class="hide fixed inset-0 bg-black/50 z-10 md:hidden" onclick="toggleSidebar()"></div>
 
       <header class="h-20 glass flex items-center justify-between px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
@@ -141,7 +153,7 @@
         </div>
       </header>
 
-      <div id="drop-zone" class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 relative">
+      <div id="drop-zone" class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 relative z-[1]">
         <div id="upload-loading" class="hide absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
           <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
           <p class="font-bold text-lg text-indigo-600 dark:text-indigo-400">กำลังจัดเก็บไฟล์...</p>
@@ -253,7 +265,25 @@
 
       <div class="mb-5">
         <h3 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">พื้นหลัง Workspace</h3>
-        <div class="grid grid-cols-3 gap-2" id="workspace-options"></div>
+        <div class="grid grid-cols-3 gap-2 mb-3" id="workspace-options"></div>
+        <div class="rounded-2xl border border-gray-200 dark:border-gray-700 p-3 space-y-3 bg-gray-50/80 dark:bg-gray-800/40">
+          <div>
+            <label class="text-xs font-semibold text-gray-600 dark:text-gray-300">เพิ่มรูปพื้นหลังของคุณ</label>
+            <div class="flex gap-2 mt-2">
+              <button onclick="document.getElementById('workspace-upload').click()" class="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">อัปโหลดรูป</button>
+              <button onclick="clearWorkspaceBackground()" class="px-4 py-2.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-sm font-semibold">ลบรูป</button>
+            </div>
+            <input type="file" id="workspace-upload" accept="image/*" class="hidden" onchange="handleWorkspaceUpload(event)" />
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-xs font-semibold text-gray-600 dark:text-gray-300">
+              <label for="workspace-blur">ความเบลอพื้นหลัง</label>
+              <span id="workspace-blur-value">0px</span>
+            </div>
+            <input id="workspace-blur" type="range" min="0" max="24" step="1" value="0" class="w-full mt-2 accent-indigo-600" oninput="setWorkspaceBlur(this.value)" />
+          </div>
+          <p class="text-[11px] text-gray-500">* รูปพื้นหลังจะแสดงเฉพาะเครื่อง/เบราว์เซอร์นี้</p>
+        </div>
       </div>
 
       <div class="mb-2">
@@ -268,8 +298,8 @@
   <div id="modal-share-import" class="hide fixed inset-0 z-[62] flex items-center justify-center p-4 bg-black/60">
     <div class="bg-white dark:bg-gray-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
       <h2 class="text-xl font-bold mb-2">รับไฟล์/โฟลเดอร์จากโค้ดแชร์</h2>
-      <p class="text-sm text-gray-500 mb-4">วางข้อความแชร์ที่ขึ้นต้นด้วย <span class="font-semibold">SC Share</span> เพื่อเพิ่มลงในพื้นที่ของคุณ</p>
-      <textarea id="share-code-input" rows="6" placeholder="SC Share&#10;xxxxx" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+      <p class="text-sm text-gray-500 mb-4">วางโค้ดแชร์ที่ขึ้นต้นด้วย <span class="font-semibold">SC</span> หรือข้อความแบบเดิมเพื่อเพิ่มลงในพื้นที่ของคุณ</p>
+      <textarea id="share-code-input" rows="6" placeholder="SC2:xxxxx" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
       <div class="flex gap-3 mt-5">
         <button onclick="closeModal('modal-share-import')" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold">ยกเลิก</button>
         <button onclick="importSharedCode()" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">นำเข้า</button>
@@ -312,7 +342,7 @@
       theme: "light",
       folders: [],
       files: [],
-      ui: { cardTheme: "indigo", workspaceTheme: "aurora", decorationEmoji: "✨" }
+      ui: { cardTheme: "indigo", workspaceTheme: "aurora", decorationEmoji: "✨", workspaceImage: "", workspaceBlur: 0 }
     };
 
     const initDB = () => new Promise((resolve, reject) => {
@@ -351,6 +381,7 @@
       
       applyTheme();
       applyWorkspaceTheme();
+      applyWorkspaceBackground();
       renderThemeOptions();
       requestPersistentStorage();
       setupDropZone();
@@ -374,7 +405,7 @@
         state = { 
           ...state, 
           ...saved, 
-          ui: { cardTheme: "indigo", workspaceTheme: "aurora", decorationEmoji: "✨", ...(saved.ui || {}) } 
+          ui: { cardTheme: "indigo", workspaceTheme: "aurora", decorationEmoji: "✨", workspaceImage: "", workspaceBlur: 0, ...(saved.ui || {}) } 
         };
       }
     }
@@ -706,31 +737,91 @@
       closeModal("modal-item-action");
     }
 
+    function splitDataURL(dataUrl = "") {
+      const [meta, base64 = ""] = dataUrl.split(",");
+      const mime = (meta.match(/data:(.*?);base64/) || [])[1] || "application/octet-stream";
+      return { mime, base64 };
+    }
+
+    function packFileForShare(file) {
+      const { mime, base64 } = splitDataURL(file.data);
+      return { n: file.name, s: file.size, m: mime, b: base64, d: file.date || Date.now(), c: file.color || state.ui.cardTheme };
+    }
+
+    function unpackSharedFile(fileLike) {
+      if (!fileLike) return null;
+      if (fileLike.data) return fileLike;
+      if (!fileLike.b || !fileLike.m || !fileLike.n) return null;
+      return {
+        name: fileLike.n,
+        size: fileLike.s || Math.ceil((fileLike.b.length * 3) / 4),
+        type: fileLike.m,
+        data: `data:${fileLike.m};base64,${fileLike.b}`,
+        date: fileLike.d || Date.now(),
+        color: fileLike.c || state.ui.cardTheme
+      };
+    }
+
     function compactItemPayload(item, isFolder) {
-      if (!isFolder) return { v: 2, t: "f", d: item };
+      if (!isFolder) return { v: 3, t: "f", d: packFileForShare(item) };
       const nested = collectNestedFolderIds(item.id);
-      return { v: 2, t: "d", r: item.id, o: state.folders.filter(f => nested.includes(f.id)), f: state.files.filter(f => nested.includes(f.folderId)) };
+      return {
+        v: 3,
+        t: "d",
+        r: item.id,
+        o: state.folders
+          .filter(f => nested.includes(f.id))
+          .map(f => ({ i: f.id, n: f.name, p: f.parentId, c: f.color || state.ui.cardTheme })),
+        f: state.files
+          .filter(f => nested.includes(f.folderId))
+          .map(f => ({ ...packFileForShare(f), o: f.folderId }))
+      };
+    }
+
+    function toBase64UrlFromBytes(bytes) {
+      let bin = "";
+      bytes.forEach(b => (bin += String.fromCharCode(b)));
+      return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    function fromBase64UrlToBytes(base) {
+      const norm = base.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = norm + "=".repeat((4 - norm.length % 4) % 4);
+      return Uint8Array.from(atob(pad), c => c.charCodeAt(0));
+    }
+
+    async function compressJson(json, format) {
+      const stream = new Blob([json]).stream().pipeThrough(new CompressionStream(format));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    async function decompressBytes(bytes, format) {
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(format));
+      return await new Response(stream).text();
     }
 
     async function encodeSharePayload(payload) {
       const json = JSON.stringify(payload);
       if (typeof CompressionStream === "undefined") return "SC0:" + btoa(unescape(encodeURIComponent(json)));
-      const stream = new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"));
-      const arr = await new Response(stream).arrayBuffer();
-      const bytes = new Uint8Array(arr);
-      let bin = "";
-      bytes.forEach(b => bin += String.fromCharCode(b));
-      return "SC1:" + btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      try {
+        const bytes = await compressJson(json, "deflate-raw");
+        return "SC2:" + toBase64UrlFromBytes(bytes);
+      } catch {
+        const bytes = await compressJson(json, "gzip");
+        return "SC1:" + toBase64UrlFromBytes(bytes);
+      }
     }
 
     async function decodeSharePayload(code) {
-      if (code.startsWith("SC1:")) {
-        const base = code.slice(4).replace(/-/g, "+").replace(/_/g, "/");
-        const pad = base + "=".repeat((4 - base.length % 4) % 4);
-        const bytes = Uint8Array.from(atob(pad), c => c.charCodeAt(0));
+      if (code.startsWith("SC2:")) {
+        const bytes = fromBase64UrlToBytes(code.slice(4));
         if (typeof DecompressionStream === "undefined") throw new Error("No decompression support");
-        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-        return JSON.parse(await new Response(stream).text());
+        return JSON.parse(await decompressBytes(bytes, "deflate-raw"));
+      }
+      if (code.startsWith("SC1:")) {
+        const bytes = fromBase64UrlToBytes(code.slice(4));
+        if (typeof DecompressionStream === "undefined") throw new Error("No decompression support");
+        return JSON.parse(await decompressBytes(bytes, "gzip"));
       }
       const norm = code.startsWith("SC0:") ? code.slice(4) : code;
       return JSON.parse(decodeURIComponent(escape(atob(norm))));
@@ -742,18 +833,17 @@
       if (!item) return;
       const payload = compactItemPayload(item, currentItem.isFolder);
       const shareCode = await encodeSharePayload(payload);
-      const text = `SC Share\n${shareCode}`;
 
       try {
-        if (navigator.share) { 
-          await navigator.share({ title: "แชร์จาก StudentCloud", text }); 
+        if (navigator.share) {
+          await navigator.share({ title: "แชร์จาก StudentCloud", text: shareCode });
         } else {
-          await navigator.clipboard.writeText(text);
-          showToast("คัดลอกโค้ดแชร์แล้ว");
+          await navigator.clipboard.writeText(shareCode);
+          showToast("คัดลอกโค้ดแชร์แบบสั้นแล้ว");
         }
       } catch {
-        await navigator.clipboard.writeText(text);
-        showToast("คัดลอกโค้ดแชร์แล้ว");
+        await navigator.clipboard.writeText(shareCode);
+        showToast("คัดลอกโค้ดแชร์แบบสั้นแล้ว");
       }
     }
 
@@ -762,7 +852,7 @@
       const fileItem = state.files.find(f => f.id === currentItem.id);
       if (!fileItem) return;
       if (!(fileItem.type?.includes("image") || fileItem.type?.includes("video"))) return showToast("รองรับเฉพาะรูป/วิดีโอ", "error");
-      if (!navigator.share) return showToast("เบราว์เซอร์นี้ยังไม่รองรับแชร์ไปแอปอื่นโดยตรง", "error");
+      if (!navigator.share) return showToast("เบราว์เซอร์นี้ยังไม่รองรับแชร์ไปแปอื่นโดยตรง", "error");
 
       try {
         const shareFile = dataURLToFile(fileItem.data, fileItem.name, fileItem.type);
@@ -798,7 +888,8 @@
         const parsed = await decodeSharePayload(code);
 
         if ((parsed.type === "file" && parsed.data) || (parsed.t === "f" && parsed.d)) {
-          const incoming = parsed.data || parsed.d;
+          const incoming = unpackSharedFile(parsed.data || parsed.d);
+          if (!incoming) return showToast("รูปแบบไฟล์ที่แชร์ไม่ถูกต้อง", "error");
           const names = state.files.filter(f => f.folderId === currentFolderId).map(f => f.name);
           state.files.push({ ...incoming, id: "fi_" + Date.now() + Math.random().toString(16).slice(2), folderId: currentFolderId, name: makeUniqueName(incoming.name, names) });
         } else if (
@@ -810,31 +901,36 @@
           const incomingRoot = parsed.rootId || parsed.r;
 
           const idMap = new Map();
-          const root = incomingFolders.find(f => f.id === incomingRoot) || incomingFolders[0];
+          const root = incomingFolders.find(f => (f.id || f.i) === incomingRoot) || incomingFolders[0];
           const rootNamePool = state.folders.filter(f => f.parentId === currentFolderId).map(f => f.name);
 
-          incomingFolders.forEach((folder, idx) => idMap.set(folder.id, "fd_" + Date.now() + "_" + idx + Math.random().toString(16).slice(2, 6)));
+          incomingFolders.forEach((folder, idx) => idMap.set((folder.id || folder.i), "fd_" + Date.now() + "_" + idx + Math.random().toString(16).slice(2, 6)));
 
           incomingFolders.forEach(folder => {
-            const isRoot = root && folder.id === root.id;
-            const parentMapped = isRoot ? currentFolderId : (idMap.get(folder.parentId) || currentFolderId);
+            const folderId = folder.id || folder.i;
+            const folderName = folder.name || folder.n;
+            const parentRef = folder.parentId || folder.p;
+            const isRoot = root && folderId === (root.id || root.i);
+            const parentMapped = isRoot ? currentFolderId : (idMap.get(parentRef) || currentFolderId);
             const siblingPool = state.folders.filter(f => f.parentId === parentMapped).map(f => f.name);
             state.folders.push({
-              ...folder,
-              id: idMap.get(folder.id),
+              id: idMap.get(folderId),
               parentId: parentMapped,
-              name: isRoot ? makeUniqueName(folder.name, rootNamePool) : makeUniqueName(folder.name, siblingPool)
+              color: folder.color || folder.c || state.ui.cardTheme,
+              name: isRoot ? makeUniqueName(folderName, rootNamePool) : makeUniqueName(folderName, siblingPool)
             });
           });
 
           incomingFiles.forEach((file, idx) => {
-            const mappedFolderId = idMap.get(file.folderId) || currentFolderId;
+            const mappedFolderId = idMap.get(file.folderId || file.o) || currentFolderId;
+            const unpacked = unpackSharedFile(file);
+            if (!unpacked) return;
             const siblingPool = state.files.filter(f => f.folderId === mappedFolderId).map(f => f.name);
             state.files.push({
-              ...file,
+              ...unpacked,
               id: "fi_" + Date.now() + "_" + idx + Math.random().toString(16).slice(2, 6),
               folderId: mappedFolderId,
-              name: makeUniqueName(file.name, siblingPool)
+              name: makeUniqueName(unpacked.name, siblingPool)
             });
           });
         } else {
@@ -873,6 +969,62 @@
       });
     }
 
+    async function handleWorkspaceUpload(e) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) return showToast("กรุณาเลือกไฟล์รูปภาพเท่านั้น", "error");
+      if (file.size > 5 * 1024 * 1024) return showToast("รูปพื้นหลังต้องไม่เกิน 5MB", "error");
+      try {
+        state.ui.workspaceImage = await readFileAsDataURL(file);
+        applyWorkspaceBackground();
+        await saveData();
+        renderThemeOptions();
+        showToast("อัปเดตรูปพื้นหลังแล้ว");
+      } catch {
+        showToast("ไม่สามารถอ่านไฟล์รูปภาพได้", "error");
+      } finally {
+        e.target.value = "";
+      }
+    }
+
+    async function clearWorkspaceBackground() {
+      if (!state.ui.workspaceImage) return;
+      state.ui.workspaceImage = "";
+      applyWorkspaceBackground();
+      await saveData();
+      renderThemeOptions();
+      showToast("ลบรูปพื้นหลังแล้ว");
+    }
+
+    async function setWorkspaceBlur(value) {
+      state.ui.workspaceBlur = Number(value) || 0;
+      applyWorkspaceBackground();
+      const blurText = document.getElementById("workspace-blur-value");
+      if (blurText) blurText.innerText = `${state.ui.workspaceBlur}px`;
+      await saveData();
+    }
+
+    function applyWorkspaceBackground() {
+      const bgEl = document.getElementById("workspace-bg");
+      if (!bgEl) return;
+      if (!state.ui.workspaceImage) {
+        bgEl.classList.add("hide");
+        bgEl.style.backgroundImage = "none";
+        return;
+      }
+      bgEl.classList.remove("hide");
+      bgEl.style.backgroundImage = `url('${state.ui.workspaceImage}')`;
+      bgEl.style.filter = `blur(${Number(state.ui.workspaceBlur || 0)}px)`;
+      bgEl.style.opacity = "0.45";
+      bgEl.style.transform = Number(state.ui.workspaceBlur || 0) > 0 ? "scale(1.03)" : "scale(1)";
+    }
+
+    function updateWorkspaceCustomizeInputs() {
+      const blurInput = document.getElementById("workspace-blur");
+      const blurText = document.getElementById("workspace-blur-value");
+      if (blurInput) blurInput.value = state.ui.workspaceBlur || 0;
+      if (blurText) blurText.innerText = `${state.ui.workspaceBlur || 0}px`;
+    }
     function renderThemeOptions() {
       const cardEl = document.getElementById("theme-options");
       const workEl = document.getElementById("workspace-options");
@@ -893,6 +1045,7 @@
 
       emojiEl.innerHTML = DECORATION_EMOJIS.map(emoji => `
         <button onclick="setDecorationEmoji('${emoji}')" class="p-2 text-2xl rounded-xl border ${state.ui.decorationEmoji === emoji ? 'border-indigo-500 ring-2 ring-indigo-300/70' : 'border-gray-200 dark:border-gray-700'}">${emoji}</button>`).join("");
+      updateWorkspaceCustomizeInputs();
     }
 
     function applyWorkspaceTheme() {
@@ -905,7 +1058,7 @@
     }
 
     async function setCardTheme(theme) { state.ui.cardTheme = theme; await saveData(); renderThemeOptions(); updateUI(); }
-    async function setWorkspaceTheme(theme) { state.ui.workspaceTheme = theme; applyWorkspaceTheme(); await saveData(); renderThemeOptions(); }
+    async function setWorkspaceTheme(theme) { state.ui.workspaceTheme = theme; applyWorkspaceTheme(); applyWorkspaceBackground(); await saveData(); renderThemeOptions(); }
     async function setDecorationEmoji(emoji) { state.ui.decorationEmoji = emoji; await saveData(); renderThemeOptions(); updateUI(); }
 
     function openPreview(fileId) {
@@ -1013,4 +1166,3 @@
   </script>
 </body>
 </html>
-
