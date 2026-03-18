@@ -47,11 +47,11 @@
   </style>
 </head>
 
-<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300 antialiased overflow-hidden h-screen flex">
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-300 antialiased overflow-x-hidden min-h-screen">
   <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
   <!-- SETUP -->
-  <div id="view-setup" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
+  <div id="view-setup" class="hide w-full min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
     <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 fade-in text-center">
       <div class="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
         <i data-lucide="hard-drive" class="w-10 h-10"></i>
@@ -78,7 +78,7 @@
   </div>
 
   <!-- LOGIN -->
-  <div id="view-login" class="hide w-full h-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
+  <div id="view-login" class="hide w-full min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-950">
     <div class="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-gray-800 fade-in text-center">
       <div class="w-24 h-24 mx-auto mb-4 relative">
         <img id="login-avatar" src="https://ui-avatars.com/api/?name=User&background=6366f1&color=fff" class="w-full h-full rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg" />
@@ -96,7 +96,7 @@
   </div>
 
   <!-- APP -->
-  <div id="view-app" class="hide w-full h-full flex">
+  <div id="view-app" class="hide w-full min-h-screen flex">
     <aside id="sidebar" class="w-72 border-r border-gray-200 dark:border-gray-800 flex flex-col bg-white dark:bg-gray-900 z-20 flex-shrink-0 transition-transform duration-300 absolute md:relative -translate-x-full md:translate-x-0 h-full">
       <div class="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
         <div class="flex items-center gap-3">
@@ -145,6 +145,7 @@
           <h2 class="text-xl font-bold truncate" id="current-view-title">หน้าแรก</h2>
         </div>
         <div class="flex items-center gap-2">
+          <div id="storage-pill" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/70 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700">0 MB / 0 GB</div>
           <button onclick="openModal('modal-share-import')" class="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-700 font-semibold text-sm"><i data-lucide="link-2" class="w-4 h-4"></i> รับโค้ดแชร์</button>
           <button onclick="openModal('modal-customize')" class="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-200 border border-pink-200 dark:border-pink-700 font-semibold text-sm"><i data-lucide="sparkles" class="w-4 h-4"></i> ตกแต่ง</button>
           <button onclick="openModal('modal-create-folder')" class="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-semibold text-sm"><i data-lucide="folder-plus" class="w-4 h-4"></i> สร้างโฟลเดอร์</button>
@@ -152,6 +153,14 @@
           <input type="file" id="file-upload" multiple class="hidden" onchange="handleFileUpload(event)" />
         </div>
       </header>
+
+      <div class="md:hidden z-[2] px-3 py-2 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="openModal('modal-share-import')" class="py-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 text-xs font-bold flex items-center justify-center gap-1"><i data-lucide="link-2" class="w-4 h-4"></i> รับโค้ด</button>
+          <button onclick="openModal('modal-customize')" class="py-2 rounded-xl bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-200 text-xs font-bold flex items-center justify-center gap-1"><i data-lucide="sparkles" class="w-4 h-4"></i> ตกแต่ง</button>
+          <button onclick="openModal('modal-create-folder')" class="py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-xs font-bold flex items-center justify-center gap-1"><i data-lucide="folder-plus" class="w-4 h-4"></i> โฟลเดอร์</button>
+        </div>
+      </div>
 
       <div id="drop-zone" class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 relative z-[1]">
         <div id="upload-loading" class="hide absolute inset-0 bg-white/50 dark:bg-black/50 backdrop-blur-sm z-20 flex flex-col items-center justify-center">
@@ -174,6 +183,10 @@
         <div id="file-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
       </div>
     </main>
+  </div>
+
+  <div class="fixed right-3 bottom-3 z-[70] text-[11px] px-2 py-1 rounded-full bg-black/60 text-white backdrop-blur-sm">
+    Crafted by StudentCloud Dev
   </div>
 
   <!-- MODALS -->
@@ -291,7 +304,7 @@
         <div class="grid grid-cols-4 gap-2" id="emoji-options"></div>
       </div>
 
-      <button onclick="closeModal('modal-customize')" class="w-full mt-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 font-semibold">ปิด</button>
+      <button onclick="closeModal('modal-customize')" class="w-full mt-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 font-semibold">ิด</button>
     </div>
   </div>
 
@@ -299,7 +312,7 @@
     <div class="bg-white dark:bg-gray-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 fade-in">
       <h2 class="text-xl font-bold mb-2">รับไฟล์/โฟลเดอร์จากโค้ดแชร์</h2>
       <p class="text-sm text-gray-500 mb-4">วางโค้ดแชร์ที่ขึ้นต้นด้วย <span class="font-semibold">SC</span> หรือข้อความแบบเดิมเพื่อเพิ่มลงในพื้นที่ของคุณ</p>
-      <textarea id="share-code-input" rows="6" placeholder="SC2:xxxxx" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+      <textarea id="share-code-input" rows="6" placeholder="SC2:&#10;xxxxx" class="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
       <div class="flex gap-3 mt-5">
         <button onclick="closeModal('modal-share-import')" class="flex-1 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 font-bold">ยกเลิก</button>
         <button onclick="importSharedCode()" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold">นำเข้า</button>
@@ -433,8 +446,15 @@
           const e = await navigator.storage.estimate();
           const usedMB = ((e.usage || 0) / (1024 * 1024)).toFixed(1);
           const quotaGB = ((e.quota || 0) / (1024 * 1024 * 1024)).toFixed(2);
-          document.getElementById("storage-text").innerText = `${usedMB} MB / ${quotaGB} GB`;
-        } else document.getElementById("storage-text").innerText = "ใช้งานอยู่";
+          const text = `${usedMB} MB / ${quotaGB} GB`;
+          document.getElementById("storage-text").innerText = text;
+          const pill = document.getElementById("storage-pill");
+          if (pill) pill.innerText = text;
+        } else {
+          document.getElementById("storage-text").innerText = "ใช้งานอยู่";
+          const pill = document.getElementById("storage-pill");
+          if (pill) pill.innerText = "ใช้งานอยู่";
+        }
       } catch {}
     }
 
@@ -833,17 +853,18 @@
       if (!item) return;
       const payload = compactItemPayload(item, currentItem.isFolder);
       const shareCode = await encodeSharePayload(payload);
+      const formattedShareCode = shareCode.startsWith("SC2:") ? `SC2:\n${shareCode.slice(4)}` : shareCode;
 
       try {
         if (navigator.share) {
-          await navigator.share({ title: "แชร์จาก StudentCloud", text: shareCode });
+          await navigator.share({ title: "แชร์จาก StudentCloud", text: formattedShareCode });
         } else {
-          await navigator.clipboard.writeText(shareCode);
-          showToast("คัดลอกโค้ดแชร์แบบสั้นแล้ว");
+          await navigator.clipboard.writeText(formattedShareCode);
+          showToast("คัดลอกโค้ดแชร์แล้ว (ไม่เกิน 2 บรรทัด)");
         }
       } catch {
-        await navigator.clipboard.writeText(shareCode);
-        showToast("คัดลอกโค้ดแชร์แบบสั้นแล้ว");
+        await navigator.clipboard.writeText(formattedShareCode);
+        showToast("คัดลอกโค้ดแชร์แล้ว (ไม่เกิน 2 บรรทัด)");
       }
     }
 
@@ -852,7 +873,7 @@
       const fileItem = state.files.find(f => f.id === currentItem.id);
       if (!fileItem) return;
       if (!(fileItem.type?.includes("image") || fileItem.type?.includes("video"))) return showToast("รองรับเฉพาะรูป/วิดีโอ", "error");
-      if (!navigator.share) return showToast("เบราว์เซอร์นี้ยังไม่รองรับแชร์ไปแปอื่นโดยตรง", "error");
+      if (!navigator.share) return showToast("เบราว์เซอร์นี้ยังไม่รองรับแชร์ไปแอปอื่นโดยตรง", "error");
 
       try {
         const shareFile = dataURLToFile(fileItem.data, fileItem.name, fileItem.type);
@@ -882,7 +903,8 @@
       const input = document.getElementById("share-code-input");
       const raw = input.value.trim();
       if (!raw) return showToast("กรุณาวางโค้ดแชร์ก่อน", "error");
-      const code = (raw.startsWith("StudentCloud Share") || raw.startsWith("SC Share")) ? raw.split("\n").slice(1).join("").trim() : raw;
+      const normalized = (raw.startsWith("StudentCloud Share") || raw.startsWith("SC Share")) ? raw.split("\n").slice(1).join("").trim() : raw;
+      const code = normalized.replace(/\s+/g, "");
 
       try {
         const parsed = await decodeSharePayload(code);
